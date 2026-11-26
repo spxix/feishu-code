@@ -6,9 +6,9 @@
 
 > 你的下一次Vibe Coding，何必从终端开始？以一流的 UI 界面和智能体协作，work ALL in 飞书。
 
-- 代码仓库：[GitHub](https://github.com/huiyeruzhou/codelark)
-- 文档站：[使用文档](https://huiyeruzhou.github.io/site/codelark/)
-- 当前 npm 版本：`codelark@0.5.1`
+- 本仓库（含 Antigravity 支持）：[GitHub (`spxix/feishu-code`)](https://github.com/spxix/feishu-code)
+- 上游项目：[huiyeruzhou/codelark](https://github.com/huiyeruzhou/codelark)（[使用文档](https://huiyeruzhou.github.io/site/codelark/)）
+- 基于上游版本：`codelark@0.5.1`
 
 ## 核心能力
 
@@ -78,25 +78,36 @@
   ```
   psmux 是原生 Windows tmux 兼容实现，会提供 `tmux.exe`，不需要 WSL。安装后请重新打开终端，并用 `tmux -V` 验证 PATH。
 
-> 如果你通过环境变量配置模型、代理或 API Key，需要在启动 `codelark` 前 export。
+> **重要提示：** 请**不要**使用 `npx codelark` 或 `npm install -g codelark`——npm 上的 `codelark` 是上游包，**不包含 Antigravity 支持**。请务必按下方步骤从本仓库（`https://github.com/spxix/feishu-code`）安装。
+> 如果你通过环境变量配置模型、代理或 API Key，需要在启动前 export。
+
+**方式一：克隆并构建（推荐，私有/公开仓库均适用）**
 
 ```bash
-npx -y codelark@latest run
+git clone git@github.com:spxix/feishu-code.git   # 或 https://github.com/spxix/feishu-code.git
+cd feishu-code
+npm install
+npm run build
+
+# 可选：链接到全局 PATH，之后可直接运行 `codelark`
+npm link
 ```
+
+安装完成后运行配置向导并启动（手动创建飞书应用请先看 [手动飞书配置指南](docs/guide/platform-setup.md)）：
 
 ```bash
-# export OPENAI_API_KEY=sk-xxx
-npm install -g codelark
-codelark run
+node dist/cli.mjs setup   # 若已执行 npm link，也可直接运行 codelark setup
+chmod 700 ~/.codelark
+node dist/cli.mjs start   # 只启动后台 bridge（或 node dist/cli.mjs run 同时打开 Web UI）
 ```
 
-使用 Node.js 24 和 Git，从 GitHub 安装最新 main（适用于 Bash / Zsh）：
+**方式二：从 GitHub 一键打包全局安装（Node.js 24+，Bash / Zsh）**
 
 ```bash
-npx --yes --package=npm@11.6.2 -c 'codelark_pkg=$(npm pack "git+https://github.com/huiyeruzhou/codelark.git#main" --silent) && npm install -g "./$codelark_pkg"'
+npx --yes --package=npm@11.6.2 -c 'codelark_pkg=$(npm pack "git+https://github.com/spxix/feishu-code.git#main" --silent) && npm install -g "./$codelark_pkg"'
 ```
 
-命令临时使用 npm 11.6.2，在当前目录生成源码构建包后全局安装；不会替换系统 npm。先打包可以避免 Git 依赖准备阶段继承全局安装配置的问题，也兼容系统 npm 12 默认禁止直接安装 Git 来源的行为。
+> **更新提醒：** 请勿点击飞书内可能弹出的上游 npm「立即更新并重启」提示（它会安装上游 `codelark` 并覆盖 Antigravity 支持）。如需关闭每日 npm 版本检查，可在启动前设置 `CODELARK_DISABLE_DAILY_VERSION_CHECK=1`；更新本仓库请直接执行 `git pull && npm install && npm run build`。
 
 ## v0.5.1
 

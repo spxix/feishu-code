@@ -166,7 +166,7 @@ codelark monitor cancel <stable-task-id> --home <codelark-home>
 | 按需 | 发送本地文件、查看历史 | `/file <path>`、`/his` |
 | 按需 | 修改当前会话或全局默认值 | `/`、`/set` |
 
-`/hot-update` 主要面向从源码仓库运行 CodeLark 的维护场景，不属于普通 npm 用户的日常流程；npm 用户使用版本提示卡或 `npm install -g codelark@latest` 更新即可。
+`/hot-update` 主要面向从源码仓库运行 CodeLark 的维护场景；使用本 fork（`spxix/feishu-code`）时请通过源码目录 `git pull && npm install && npm run build` 更新，不要用 `npm install -g codelark@latest`（那会安装不含 Antigravity 支持的上游版本）。
 
 ## 下一步
 

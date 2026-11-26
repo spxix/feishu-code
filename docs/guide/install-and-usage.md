@@ -4,21 +4,30 @@
 
 CodeLark 不接管 `~/.codex`、`~/.claude-code`、`~/.claude-code-router`、`~/.kimi-code`、`~/.cursor`、`~/.zcode` 或 `~/.gemini/antigravity-cli` 的模型供应商配置。Codex CLI、Claude Code、CCR、Kimi Code、Cursor Agent、ZCode、Antigravity (`agy`) 或 API 登录态仍按你的本机环境自行准备；CodeLark 只保存自己的配置和桥接状态。Cursor Agent 可通过 [Cursor 官方安装入口](https://cursor.com/install) 安装，并需先在本机终端完成登录；Antigravity 通过本机 `agy acp` 协议直连，不依赖 `tmux`。
 
+> **重要提示：** 请**不要**通过 `npx codelark` 或 `npm install -g codelark` 安装——npm 官方源是上游版本，不包含 Antigravity 支持。请从本仓库 **`https://github.com/spxix/feishu-code`** 安装：
+
 ```bash
-# export OPENAI_API_KEY=sk-xxx
-npm install -g codelark
-codelark run
+git clone git@github.com:spxix/feishu-code.git   # 或 https://github.com/spxix/feishu-code.git
+cd feishu-code
+npm install
+npm run build
+npm link   # 可选：注册全局 `codelark` 命令；否则用 `node dist/cli.mjs ...`
 ```
 
-## 自动检查更新
+或使用 GitHub 一键打包安装（Node.js 24+，Bash / Zsh）：
 
-Bridge 每个本地自然日最多检查一次 npm 最新版本。检查由当天收到的第一条飞书消息触发，但版本查询和提示卡投递都在消息处理链路之外执行，不会延迟这条消息进入会话。
+```bash
+npx --yes --package=npm@11.6.2 -c 'codelark_pkg=$(npm pack "git+https://github.com/spxix/feishu-code.git#main" --silent) && npm install -g "./$codelark_pkg"'
+```
 
-- “立即更新并重启”会在后台执行全局 npm 安装，然后停止并重新启动 CodeLark；它不执行 git pull、项目构建或测试。
-- “忽略此版本”会停止提示这个版本，直到 npm 发布更高版本。
-- 卡片保留可复制的手动命令：`npm install -g --yes codelark && codelark stop && codelark start`。
+## 更新与版本检查
 
-检查状态保存在 `~/.codelark/version-check.json`，Bridge 启动时读取一次，之后在进程内缓存；不会因为每条消息反复读取文件。自动更新日志写在 `~/.codelark/logs/version-update-*.log`。
+Bridge 默认每个本地自然日最多检查一次上游 npm 最新版本。**如果你使用本仓库（含 Antigravity 支持），请不要点击卡片上的“立即更新并重启”或执行 `npm install -g codelark`**（否则会被上游版本覆盖）。
+
+- 如需禁用每日 npm 版本检查，启动前设置环境变量：`CODELARK_DISABLE_DAILY_VERSION_CHECK=1`。
+- 更新本仓库请直接在源码目录执行：`git pull && npm install && npm run build && node dist/cli.mjs restart`。
+
+检查状态保存在 `~/.codelark/version-check.json`，Bridge 启动时读取一次，之后在进程内缓存；不会因为每条消息反复读取文件。
 
 ## 前置条件
 
