@@ -15,6 +15,9 @@ import {
   cursorReasoningEffortSchema,
   zcodeProviderSchema,
   zcodeModeSchema,
+  antigravityProviderSchema,
+  antigravityModeSchema,
+  antigravityReasoningEffortSchema,
   reasoningEffortSchema,
   runtimeAgentSchema,
   sandboxModeSchema,
@@ -110,6 +113,14 @@ const uiConfigPayloadSchema = z.object({
   zcodeDefaultModel: optionalString(),
   zcodeProvider: optionalEnum(zcodeProviderSchema),
   zcodeMode: optionalEnum(zcodeModeSchema),
+  antigravityDefaultModel: optionalString(),
+  antigravityProvider: optionalEnum(antigravityProviderSchema),
+  antigravityMode: optionalEnum(antigravityModeSchema),
+  antigravityReasoningEffort: z.preprocess(
+    (value) => typeof value === 'string' ? value.trim().toLowerCase() : value,
+    z.union([antigravityReasoningEffortSchema, z.literal('')]),
+  ).optional(),
+  antigravitySandbox: z.boolean().optional(),
   uiAllowLan: z.boolean().optional(),
   uiAccessToken: optionalString(),
 }).strict();
@@ -174,6 +185,11 @@ export function configV2ToPayload(config: ConfigV2, presentation: UiConfigPresen
     zcodeDefaultModel: config.runtime.zcode.model || '',
     zcodeProvider: config.runtime.zcode.provider || 'tmux',
     zcodeMode: config.runtime.zcode.mode || 'build',
+    antigravityDefaultModel: config.runtime.antigravity.model || '',
+    antigravityProvider: config.runtime.antigravity.provider || 'acp',
+    antigravityMode: config.runtime.antigravity.mode || 'default',
+    antigravityReasoningEffort: config.runtime.antigravity.reasoningEffort || '',
+    antigravitySandbox: config.runtime.antigravity.sandbox === true,
     uiAllowLan: config.bridge.uiAllowLan === true,
     uiAccessToken: config.bridge.uiAccessToken || '',
     channels: config.channels.map(v2ChannelToPayload),
@@ -259,6 +275,17 @@ export function mergeConfigV2HomePatch(current: ConfigV2, payload: Record<string
           : parsed.zcodeDefaultModel || '',
         provider: parsed.zcodeProvider ?? current.runtime.zcode.provider,
         mode: parsed.zcodeMode ?? current.runtime.zcode.mode,
+      },
+      antigravity: {
+        model: parsed.antigravityDefaultModel === undefined
+          ? current.runtime.antigravity.model
+          : parsed.antigravityDefaultModel || '',
+        provider: parsed.antigravityProvider ?? current.runtime.antigravity.provider,
+        mode: parsed.antigravityMode ?? current.runtime.antigravity.mode,
+        reasoningEffort: parsed.antigravityReasoningEffort ?? current.runtime.antigravity.reasoningEffort,
+        sandbox: hasPayloadKey(payload, 'antigravitySandbox')
+          ? parsed.antigravitySandbox === true
+          : current.runtime.antigravity.sandbox,
       },
     },
     bridge: {

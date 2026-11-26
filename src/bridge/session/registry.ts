@@ -24,6 +24,8 @@ import {
   getSessionCursorSessionId,
   getSessionZcodeCwd,
   getSessionZcodeSessionId,
+  getSessionAntigravityCwd,
+  getSessionAntigravitySessionId,
 } from '../../domain/session-runtime.js';
 
 export {
@@ -89,12 +91,18 @@ export interface ZcodeThreadRegistryPort {
   archiveThread?(zcodeSessionId: string, cwd: string): boolean;
 }
 
+export interface AntigravityThreadRegistryPort {
+  getThread(antigravitySessionId: string, cwd: string): { antigravitySessionId: string; title: string; cwd: string } | null;
+  archiveThread?(antigravitySessionId: string, cwd: string): boolean;
+}
+
 export interface SessionRegistryOptions {
   codexThreads?: CodexThreadRegistryPort;
   claudeThreads?: ClaudeThreadRegistryPort;
   kimiThreads?: KimiThreadRegistryPort;
   cursorThreads?: CursorThreadRegistryPort;
   zcodeThreads?: ZcodeThreadRegistryPort;
+  antigravityThreads?: AntigravityThreadRegistryPort;
   readDefaultModel?: () => string | null | undefined;
   defaultWorkingDirectory?: () => string;
 }
@@ -133,6 +141,13 @@ export interface ArchiveCursorThreadResult {
 
 export interface ArchiveZcodeThreadResult {
   zcodeSessionId: string;
+  cwd: string;
+  deletedBridgeSessions: BridgeSession[];
+  deletedBridgeSessionIds: string[];
+}
+
+export interface ArchiveAntigravityThreadResult {
+  antigravitySessionId: string;
   cwd: string;
   deletedBridgeSessions: BridgeSession[];
   deletedBridgeSessionIds: string[];
@@ -240,6 +255,16 @@ export class SessionRegistryService {
       && getSessionActiveRuntime(session) === 'zcode'
       && getSessionZcodeSessionId(session) === zcodeSessionId
       && getSessionZcodeCwd(session) === resolvedCwd
+    )) || null;
+  }
+
+  findVisibleBridgeSessionByAntigravityThread(antigravitySessionId: string, cwd: string): BridgeSession | null {
+    const resolvedCwd = this.options.antigravityThreads?.getThread(antigravitySessionId, cwd)?.cwd || cwd;
+    return this.store.listSessions().find((session) => (
+      isVisibleBridgeSession(session)
+      && getSessionActiveRuntime(session) === 'antigravity'
+      && getSessionAntigravitySessionId(session) === antigravitySessionId
+      && (!resolvedCwd || !getSessionAntigravityCwd(session) || getSessionAntigravityCwd(session) === resolvedCwd)
     )) || null;
   }
 
@@ -396,6 +421,34 @@ export class SessionRegistryService {
     return this.store.getSession(session.id) || session;
   }
 
+  materializeAntigravityThread(antigravitySessionId: string, cwd: string): BridgeSession {
+    const existing = this.findVisibleBridgeSessionByAntigravityThread(antigravitySessionId, cwd);
+    if (existing) return existing;
+    const localThread = this.options.antigravityThreads?.getThread(antigravitySessionId, cwd) || null;
+    if (!localThread) throw new Error('指定的 Antigravity 会话不存在。');
+    const session = this.store.createSession(
+      localThread.title || '',
+      this.options.readDefaultModel?.() || 'default',
+      undefined,
+      localThread.cwd || this.options.defaultWorkingDirectory?.() || process.cwd(),
+      'normal',
+      { activeRuntime: 'antigravity' },
+    );
+    this.store.updateSession(session.id, {
+      name: localThread.title || session.name,
+      runtime: {
+        activeRuntime: 'antigravity',
+        antigravity: {
+          sessionId: localThread.antigravitySessionId,
+          cwd: localThread.cwd,
+          provider: 'acp',
+        },
+        general: { workingDirectory: localThread.cwd },
+      },
+    }, { touch: false });
+    return this.store.getSession(session.id) || session;
+  }
+
   renameBridgeSession(bridgeSessionId: string, name: string | undefined): BridgeSession {
     const session = this.getVisibleBridgeSession(bridgeSessionId);
     this.store.updateSession(session.id, { name });
@@ -424,6 +477,11 @@ export class SessionRegistryService {
 
   renameZcodeThread(zcodeSessionId: string, cwd: string, name: string | undefined): BridgeSession {
     const session = this.materializeZcodeThread(zcodeSessionId, cwd);
+    return this.renameBridgeSession(session.id, name);
+  }
+
+  renameAntigravityThread(antigravitySessionId: string, cwd: string, name: string | undefined): BridgeSession {
+    const session = this.materializeAntigravityThread(antigravitySessionId, cwd);
     return this.renameBridgeSession(session.id, name);
   }
 
@@ -557,6 +615,27 @@ export class SessionRegistryService {
     return {
       zcodeSessionId,
       cwd: localThread.cwd,
+      deletedBridgeSessions: linkedSessions,
+      deletedBridgeSessionIds: linkedSessions.map((session) => session.id),
+    };
+  }
+
+  archiveAntigravityThread(antigravitySessionId: string, cwd: string): ArchiveAntigravityThreadResult {
+    if (!this.options.antigravityThreads?.archiveThread) {
+      throw new Error('Local Antigravity archive is not configured.');
+    }
+    const localThread = this.options.antigravityThreads.getThread(antigravitySessionId, cwd);
+    const resolvedCwd = localThread?.cwd || cwd;
+    const archived = this.options.antigravityThreads.archiveThread(antigravitySessionId, resolvedCwd);
+    if (!archived) throw new Error('指定的 Antigravity 会话不存在。');
+    const linkedSessions = this.store.listSessions().filter((session) => (
+      getSessionActiveRuntime(session) === 'antigravity'
+      && getSessionAntigravitySessionId(session) === antigravitySessionId
+    ));
+    for (const session of linkedSessions) this.store.deleteSession(session.id);
+    return {
+      antigravitySessionId,
+      cwd: resolvedCwd,
       deletedBridgeSessions: linkedSessions,
       deletedBridgeSessionIds: linkedSessions.map((session) => session.id),
     };

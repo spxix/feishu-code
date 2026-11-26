@@ -12,8 +12,8 @@ import type { OutboundRichCard } from '../../domain/index.js';
 import type { ChannelAddress } from '../../domain/index.js';
 import { configFields, type ConfigPath } from '../../configuration/fields.js';
 
-export type SettingGroupKey = 'runtime' | 'runtime.codex' | 'runtime.claude' | 'runtime.kimi' | 'runtime.cursor' | 'runtime.zcode' | 'bridge' | 'channels.feishu';
-export type CurrentSessionConfigSection = 'common' | 'codex' | 'claude' | 'kimi' | 'cursor' | 'zcode';
+export type SettingGroupKey = 'runtime' | 'runtime.codex' | 'runtime.claude' | 'runtime.kimi' | 'runtime.cursor' | 'runtime.zcode' | 'runtime.antigravity' | 'bridge' | 'channels.feishu';
+export type CurrentSessionConfigSection = 'common' | 'codex' | 'claude' | 'kimi' | 'cursor' | 'zcode' | 'antigravity';
 export const SESSION_CONFIG_INHERIT_VALUE = 'clk:config:inherit';
 type SettingControl = 'select' | 'input';
 
@@ -71,6 +71,11 @@ const SETTING_DISPLAY_LABELS: Record<string, string> = {
   zcodeDefaultModel: '模型',
   zcodeProvider: 'Provider（运行方式）',
   zcodeMode: '模式',
+  antigravityDefaultModel: '模型',
+  antigravityProvider: 'Provider（运行方式）',
+  antigravityMode: '模式',
+  antigravityReasoningEffort: '思考级别',
+  antigravitySandbox: '沙箱模式',
   defaultWorkspaceRoot: '默认工作目录',
   tmuxCaptureLines: 'tmux 输出行数',
   tmuxEchoInput: '回显 tmux 输入',
@@ -113,6 +118,11 @@ const SETTING_FORM_NAMES: Record<string, string> = {
   zcodeDefaultModel: 'zcode_model',
   zcodeProvider: 'zcode_provider',
   zcodeMode: 'zcode_mode',
+  antigravityDefaultModel: 'agy_model',
+  antigravityProvider: 'agy_provider',
+  antigravityMode: 'agy_mode',
+  antigravityReasoningEffort: 'agy_reasoning',
+  antigravitySandbox: 'agy_sandbox',
   uiAllowLan: 'ui_lan',
   uiAccessToken: 'ui_token',
   historyMessageLimit: 'hist_limit',
@@ -160,6 +170,12 @@ const SETTING_GROUPS: SettingGroupDefinition[] = [
     title: 'ZCode',
     subtitle: 'ZCode TUI runtime 的 TOML 默认值。',
     aliases: ['zcode', '[runtime.zcode]'],
+  },
+  {
+    key: 'runtime.antigravity',
+    title: 'Antigravity',
+    subtitle: 'Google Antigravity CLI (agy acp) runtime 的 TOML 默认值。',
+    aliases: ['antigravity', 'agy', '[runtime.antigravity]'],
   },
   {
     key: 'bridge',
@@ -286,14 +302,14 @@ const SETTING_DEFINITIONS: SettingDefinition[] = [
     group: 'runtime',
     aliases: ['defaultRuntime', 'agent'],
     label: 'agent',
-    usage: '/set runtime codex|claude|kimi|cursor|zcode',
+    usage: '/set runtime codex|claude|kimi|cursor|zcode|antigravity',
     control: 'select',
-    options: [selectOption('codex'), selectOption('claude'), selectOption('kimi'), selectOption('cursor'), selectOption('zcode')],
+    options: [selectOption('codex'), selectOption('claude'), selectOption('kimi'), selectOption('cursor'), selectOption('zcode'), selectOption('antigravity')],
     read: (config) => config.runtime.agent,
     write(rawValue) {
       const token = rawValue.trim().toLowerCase();
-      if (token === 'codex' || token === 'claude' || token === 'kimi' || token === 'cursor' || token === 'zcode') return patch({ runtime: { agent: token } });
-      return { ok: false, message: 'Runtime 必须是 codex、claude、kimi、cursor 或 zcode。' };
+      if (token === 'codex' || token === 'claude' || token === 'kimi' || token === 'cursor' || token === 'zcode' || token === 'antigravity') return patch({ runtime: { agent: token } });
+      return { ok: false, message: 'Runtime 必须是 codex、claude、kimi、cursor、zcode 或 antigravity。' };
     },
   },
   {
@@ -681,6 +697,86 @@ const SETTING_DEFINITIONS: SettingDefinition[] = [
     },
   },
   {
+    key: 'antigravityDefaultModel',
+    tomlPath: 'runtime.antigravity.model',
+    group: 'runtime.antigravity',
+    aliases: ['antigravityModel', 'agyModel'],
+    label: 'model',
+    usage: '/set antigravityDefaultModel <model> 或 /set antigravityDefaultModel default',
+    control: 'input',
+    placeholder: '留空则跟随 Antigravity 默认',
+    read: (config) => config.runtime.antigravity.model || '-',
+    write: writeStringPatch((value) => ({ runtime: { antigravity: { model: value } } })),
+  },
+  {
+    key: 'antigravityProvider',
+    tomlPath: 'runtime.antigravity.provider',
+    group: 'runtime.antigravity',
+    aliases: ['antigravityDefaultProvider', 'agyProvider'],
+    label: 'provider',
+    usage: '/set antigravityProvider acp',
+    control: 'select',
+    options: [selectOption('acp')],
+    read: (config) => config.runtime.antigravity.provider || 'acp',
+    write(rawValue) {
+      if (rawValue.trim().toLowerCase() === 'acp') return patch({ runtime: { antigravity: { provider: 'acp' } } });
+      return { ok: false, message: 'Antigravity Provider 当前只支持 acp。' };
+    },
+  },
+  {
+    key: 'antigravityMode',
+    tomlPath: 'runtime.antigravity.mode',
+    group: 'runtime.antigravity',
+    aliases: ['antigravityDefaultMode', 'agyMode'],
+    label: 'mode',
+    usage: '/set antigravityMode default|accept-edits|auto|plan|yolo',
+    control: 'select',
+    options: [selectOption('default'), selectOption('accept-edits'), selectOption('auto'), selectOption('plan'), selectOption('yolo')],
+    read: (config) => config.runtime.antigravity.mode,
+    write(rawValue) {
+      const token = rawValue.trim().toLowerCase();
+      if (token === 'default' || token === 'accept-edits' || token === 'auto' || token === 'plan' || token === 'yolo') {
+        return patch({ runtime: { antigravity: { mode: token } } });
+      }
+      return { ok: false, message: 'Antigravity 模式必须是 default、accept-edits、auto、plan 或 yolo。' };
+    },
+  },
+  {
+    key: 'antigravityReasoningEffort',
+    tomlPath: 'runtime.antigravity.reasoning_effort',
+    group: 'runtime.antigravity',
+    aliases: ['antigravityReasoning', 'agyReasoning'],
+    label: 'reasoning_effort',
+    usage: '/set antigravityReasoningEffort default|low|medium|high|xhigh',
+    control: 'select',
+    options: [selectOption('default'), selectOption('low'), selectOption('medium'), selectOption('high'), selectOption('xhigh')],
+    read: (config) => config.runtime.antigravity.reasoningEffort || 'default',
+    write(rawValue) {
+      const token = rawValue.trim().toLowerCase();
+      if (token === 'default') return patch({ runtime: { antigravity: { reasoningEffort: '' } } });
+      if (token === 'low' || token === 'medium' || token === 'high' || token === 'xhigh') {
+        return patch({ runtime: { antigravity: { reasoningEffort: token } } });
+      }
+      return { ok: false, message: 'Antigravity 思考级别必须是 default、low、medium、high 或 xhigh。' };
+    },
+  },
+  {
+    key: 'antigravitySandbox',
+    tomlPath: 'runtime.antigravity.sandbox',
+    group: 'runtime.antigravity',
+    aliases: ['agySandbox'],
+    label: 'sandbox',
+    usage: '/set antigravitySandbox on|off',
+    control: 'select',
+    options: boolOptions(),
+    read: (config) => (config.runtime.antigravity.sandbox ? 'on' : 'off'),
+    write(rawValue) {
+      const parsed = parseBoolean(rawValue);
+      if (parsed === null) return { ok: false, message: 'Antigravity 沙箱必须是 on 或 off。' };
+      return patch({ runtime: { antigravity: { sandbox: parsed } } });
+    },
+  },
+  {
     key: 'uiAllowLan',
     tomlPath: 'bridge.ui_allow_lan',
     group: 'bridge',
@@ -836,7 +932,7 @@ function findGroup(raw: string): SettingGroupDefinition | undefined {
   ));
 }
 
-const CURRENT_RUNTIME_SETTING_KEYS: Record<'codex' | 'claude' | 'kimi' | 'cursor' | 'zcode', string[]> = {
+const CURRENT_RUNTIME_SETTING_KEYS: Record<'codex' | 'claude' | 'kimi' | 'cursor' | 'zcode' | 'antigravity', string[]> = {
   codex: [
     'defaultModel',
     'defaultMode',
@@ -864,6 +960,7 @@ const CURRENT_RUNTIME_SETTING_KEYS: Record<'codex' | 'claude' | 'kimi' | 'cursor
     'cursorReasoningEffort',
   ],
   zcode: ['zcodeDefaultModel', 'zcodeProvider', 'zcodeMode'],
+  antigravity: ['antigravityDefaultModel', 'antigravityProvider', 'antigravityMode', 'antigravityReasoningEffort', 'antigravitySandbox'],
 };
 
 const SETTING_GROUP_ORDERS: Partial<Record<SettingGroupKey, string[]>> = {
@@ -902,6 +999,7 @@ const SETTING_GROUP_ORDERS: Partial<Record<SettingGroupKey, string[]>> = {
     'cursorReasoningEffort',
   ],
   'runtime.zcode': ['zcodeDefaultModel', 'zcodeProvider', 'zcodeMode'],
+  'runtime.antigravity': ['antigravityDefaultModel', 'antigravityProvider', 'antigravityMode', 'antigravityReasoningEffort', 'antigravitySandbox'],
 };
 
 function groupDefinitions(groupKey: SettingGroupKey): SettingDefinition[] {
@@ -913,10 +1011,12 @@ function groupDefinitions(groupKey: SettingGroupKey): SettingDefinition[] {
 }
 
 export function runtimeSettingDefinitions(
-  runtime: 'codex' | 'claude' | 'kimi' | 'cursor' | 'zcode',
+  runtime: 'codex' | 'claude' | 'kimi' | 'cursor' | 'zcode' | 'antigravity',
   options: { sessionWritableOnly?: boolean } = {},
 ): SettingDefinition[] {
-  const definitions = groupDefinitions(runtime === 'zcode'
+  const definitions = groupDefinitions(runtime === 'antigravity'
+    ? 'runtime.antigravity'
+    : runtime === 'zcode'
     ? 'runtime.zcode'
     : runtime === 'cursor'
     ? 'runtime.cursor'
@@ -935,7 +1035,7 @@ export function settingConfigPath(definition: Pick<SettingDefinition, 'tomlPath'
 }
 
 export function currentSessionSettingDefinitions(
-  runtime: 'codex' | 'claude' | 'kimi' | 'cursor' | 'zcode',
+  runtime: 'codex' | 'claude' | 'kimi' | 'cursor' | 'zcode' | 'antigravity',
 ): SettingDefinition[] {
   return runtimeSettingDefinitions(runtime, { sessionWritableOnly: true });
 }

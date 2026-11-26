@@ -24,11 +24,17 @@ import {
   readZcodeSessionMessages,
   readZcodeSessionMirrorRecords,
 } from '../../runtime/zcode/session-index.js';
+import {
+  findAntigravitySessionById,
+  readAntigravitySessionMessagesByFilePath,
+} from '../../runtime/antigravity/session-index.js';
 import { getCodexSessionByThreadIdSafe } from './support.js';
 import type { ChannelChat } from '../../domain/channel.js';
 import type { BridgeSession } from '../../domain/session.js';
 import {
   getSessionActiveRuntime,
+  getSessionAntigravityCwd,
+  getSessionAntigravitySessionId,
   getSessionClaudeCwd,
   getSessionClaudeSessionId,
   getSessionCodexTitle,
@@ -43,7 +49,7 @@ import {
 import { getCodexThreadId } from '../turn/turn-classifier.js';
 
 export interface SessionTranscriptFile {
-  runtime: 'codex' | 'claude' | 'kimi' | 'cursor' | 'zcode';
+  runtime: 'codex' | 'claude' | 'kimi' | 'cursor' | 'zcode' | 'antigravity';
   filePath: string;
   fileName: string;
   threadId: string;
@@ -66,7 +72,7 @@ export interface SessionTranscriptHistoryEntry {
 }
 
 export interface SessionTranscriptSource {
-  readonly runtime: 'codex' | 'claude' | 'kimi' | 'cursor' | 'zcode';
+  readonly runtime: 'codex' | 'claude' | 'kimi' | 'cursor' | 'zcode' | 'antigravity';
   resolve(session: BridgeSession | null, binding: ChannelChat): SessionTranscriptFile | null;
   readMessages(transcript: SessionTranscriptFile, limit: number): SessionTranscriptMessage[];
   readHistory(transcript: SessionTranscriptFile): SessionTranscriptHistoryEntry[];
@@ -289,12 +295,56 @@ export class ZcodeSessionTranscriptSource implements SessionTranscriptSource {
   }
 }
 
+export class AntigravitySessionTranscriptSource implements SessionTranscriptSource {
+  readonly runtime = 'antigravity' as const;
+
+  resolve(session: BridgeSession | null): SessionTranscriptFile | null {
+    const sessionId = getSessionAntigravitySessionId(session);
+    const cwd = getSessionAntigravityCwd(session) || getSessionWorkingDirectory(session);
+    if (!sessionId) return null;
+    const found = findAntigravitySessionById(sessionId, cwd || undefined, { includeArchived: true });
+    if (!found || !isReadableFile(found.filePath)) return null;
+    return {
+      runtime: this.runtime,
+      filePath: found.filePath,
+      fileName: path.basename(found.filePath),
+      threadId: found.sessionId,
+      title: session?.name || found.title || found.sessionId,
+      sourceLabel: 'Antigravity transcript JSONL',
+    };
+  }
+
+  readMessages(transcript: SessionTranscriptFile, limit: number): SessionTranscriptMessage[] {
+    return readAntigravitySessionMessagesByFilePath(transcript.filePath, limit)
+      .map(message => ({ role: message.role, content: message.content }));
+  }
+
+  readHistory(transcript: SessionTranscriptFile): SessionTranscriptHistoryEntry[] {
+    return readAntigravitySessionMessagesByFilePath(transcript.filePath, 0)
+      .filter(message => message.role !== 'user')
+      .map(message => ({
+        role: message.role || 'assistant',
+        kind: 'message',
+        content: message.content,
+        timestamp: message.timestamp || '',
+        rawJsonl: JSON.stringify({
+          runtime: this.runtime,
+          type: 'message',
+          role: message.role || 'assistant',
+          content: message.content,
+          timestamp: message.timestamp || '',
+        }),
+      }));
+  }
+}
+
 export const defaultSessionTranscriptSources: readonly SessionTranscriptSource[] = [
   new CodexSessionTranscriptSource(),
   new ClaudeSessionTranscriptSource(),
   new KimiSessionTranscriptSource(),
   new CursorSessionTranscriptSource(),
   new ZcodeSessionTranscriptSource(),
+  new AntigravitySessionTranscriptSource(),
 ];
 
 export function resolveSessionTranscriptFile(

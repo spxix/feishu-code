@@ -6,9 +6,9 @@ export type BridgeTurnKind =
   | 'codex_mirror';
 
 export type BridgeTurnOrigin = 'im' | 'codex';
-export type BridgeTurnProgressSource = 'sdk_stream' | 'codex_jsonl' | 'claude_jsonl' | 'kimi_jsonl' | 'cursor_jsonl' | 'zcode_sqlite';
-export type BridgeTurnFinalSource = 'sdk_result' | 'codex_task_complete' | 'claude_task_complete' | 'kimi_task_complete' | 'cursor_task_complete' | 'zcode_task_complete';
-export type BridgeTurnRuntime = 'codex' | 'claude' | 'kimi' | 'cursor' | 'zcode';
+export type BridgeTurnProgressSource = 'sdk_stream' | 'codex_jsonl' | 'claude_jsonl' | 'kimi_jsonl' | 'cursor_jsonl' | 'zcode_sqlite' | 'antigravity_acp';
+export type BridgeTurnFinalSource = 'sdk_result' | 'codex_task_complete' | 'claude_task_complete' | 'kimi_task_complete' | 'cursor_task_complete' | 'zcode_task_complete' | 'antigravity_task_complete';
+export type BridgeTurnRuntime = 'codex' | 'claude' | 'kimi' | 'cursor' | 'zcode' | 'antigravity';
 
 export interface ActiveBridgeTurn {
   id: string;
@@ -37,6 +37,7 @@ export interface BridgeTurnClassification {
     | 'runtime_kimi'
     | 'runtime_cursor'
     | 'runtime_zcode'
+    | 'runtime_antigravity'
     | 'bridge_thread'
     | 'new_bridge_thread';
 }

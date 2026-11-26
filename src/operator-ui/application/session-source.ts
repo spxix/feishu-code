@@ -27,6 +27,13 @@ import {
   readZcodeSessionMessages,
   type ZcodeSessionSummary,
 } from '../../runtime/zcode/session-index.js';
+import {
+  archiveAntigravitySession,
+  findAntigravitySessionById,
+  listAntigravitySessionSummaries,
+  readAntigravitySessionMessagesByFilePath,
+  type AntigravitySessionSummary,
+} from '../../runtime/antigravity/session-index.js';
 import type { LocalRuntimeSessionSummary } from '../../bridge/session/local-runtime-session.js';
 import type { RuntimeAgent } from '../../domain/session.js';
 import {
@@ -77,6 +84,13 @@ export interface UiSessionZcodeSource {
   getThread(zcodeSessionId: string, cwd: string): ZcodeSessionSummary | null;
   readJsonlHistory(zcodeSessionId: string, cwd: string): CodexSessionJsonlHistoryEntry[];
   archiveThread(zcodeSessionId: string, cwd: string): boolean;
+}
+
+export interface UiSessionAntigravitySource {
+  listSessions(): AntigravitySessionSummary[];
+  getThread(antigravitySessionId: string, cwd?: string): AntigravitySessionSummary | null;
+  readJsonlHistory(antigravitySessionId: string, cwd?: string): CodexSessionJsonlHistoryEntry[];
+  archiveThread(antigravitySessionId: string, cwd?: string): boolean;
 }
 
 export interface UiSessionRuntimeSource {
@@ -218,6 +232,33 @@ export const defaultUiSessionZcodeSource: UiSessionZcodeSource = {
   },
 };
 
+export const defaultUiSessionAntigravitySource: UiSessionAntigravitySource = {
+  listSessions: () => listAntigravitySessionSummaries(),
+  getThread: (antigravitySessionId, cwd) => findAntigravitySessionById(antigravitySessionId, cwd),
+  readJsonlHistory(antigravitySessionId, cwd) {
+    const session = findAntigravitySessionById(antigravitySessionId, cwd);
+    if (!session) return [];
+    return readAntigravitySessionMessagesByFilePath(session.filePath, Number.MAX_SAFE_INTEGER)
+      .map((message, index) => ({
+        signature: `antigravity-history:${session.sessionId}:${index}`,
+        role: message.role,
+        kind: 'message',
+        content: message.content,
+        timestamp: message.timestamp || '',
+        rawJsonl: JSON.stringify({
+          runtime: 'antigravity',
+          type: 'message',
+          role: message.role,
+          content: message.content,
+          timestamp: message.timestamp || '',
+        }),
+      }));
+  },
+  archiveThread(antigravitySessionId, cwd) {
+    return Boolean(archiveAntigravitySession(antigravitySessionId, cwd));
+  },
+};
+
 function toRuntimeCodexSession(session: CodexSessionSummary): LocalRuntimeSessionSummary {
   return { ...session, runtime: 'codex' };
 }
@@ -282,12 +323,28 @@ function toRuntimeZcodeSession(session: ZcodeSessionSummary): LocalRuntimeSessio
   };
 }
 
+function toRuntimeAntigravitySession(session: AntigravitySessionSummary): LocalRuntimeSessionSummary {
+  return {
+    runtime: 'antigravity',
+    threadId: session.sessionId,
+    filePath: session.filePath,
+    cwd: session.cwd,
+    originator: 'Antigravity',
+    source: 'antigravity',
+    firstSeenAt: session.createdAt || session.updatedAt || '',
+    lastEventAt: session.updatedAt || session.createdAt || '',
+    title: session.title || session.sessionId.slice(0, 8),
+    activeEstimate: false,
+  };
+}
+
 export function createUiSessionRuntimeSource(
   codexSource: UiSessionCodexSource = defaultUiSessionCodexSource,
   claudeSource: UiSessionClaudeSource = defaultUiSessionClaudeSource,
   kimiSource: UiSessionKimiSource = defaultUiSessionKimiSource,
   cursorSource: UiSessionCursorSource = defaultUiSessionCursorSource,
   zcodeSource: UiSessionZcodeSource = defaultUiSessionZcodeSource,
+  antigravitySource: UiSessionAntigravitySource = defaultUiSessionAntigravitySource,
 ): UiSessionRuntimeSource {
   return {
     listSessions() {
@@ -297,12 +354,17 @@ export function createUiSessionRuntimeSource(
         ...kimiSource.listSessions().map(toRuntimeKimiSession),
         ...cursorSource.listSessions().map(toRuntimeCursorSession),
         ...zcodeSource.listSessions().map(toRuntimeZcodeSession),
+        ...antigravitySource.listSessions().map(toRuntimeAntigravitySession),
       ].sort((left, right) => right.lastEventAt.localeCompare(left.lastEventAt));
     },
     getThread(runtime, threadId, cwd) {
       if (runtime === 'codex') {
         const session = codexSource.getThread(threadId);
         return session ? toRuntimeCodexSession(session) : null;
+      }
+      if (runtime === 'antigravity') {
+        const session = antigravitySource.getThread(threadId, cwd);
+        return session ? toRuntimeAntigravitySession(session) : null;
       }
       if (!cwd) return null;
       if (runtime === 'kimi') {
@@ -322,6 +384,7 @@ export function createUiSessionRuntimeSource(
     },
     readJsonlHistory(runtime, threadId, cwd) {
       if (runtime === 'codex') return codexSource.readJsonlHistory(threadId);
+      if (runtime === 'antigravity') return antigravitySource.readJsonlHistory(threadId, cwd);
       if (runtime === 'kimi') return cwd ? kimiSource.readJsonlHistory(threadId, cwd) : [];
       if (runtime === 'cursor') return cwd ? cursorSource.readJsonlHistory(threadId, cwd) : [];
       if (runtime === 'zcode') return cwd ? zcodeSource.readJsonlHistory(threadId, cwd) : [];
@@ -329,6 +392,7 @@ export function createUiSessionRuntimeSource(
     },
     archiveThread(runtime, threadId, cwd) {
       if (runtime === 'codex') return codexSource.archiveThread(threadId);
+      if (runtime === 'antigravity') return antigravitySource.archiveThread(threadId, cwd);
       if (runtime === 'kimi') return cwd ? kimiSource.archiveThread(threadId, cwd) : false;
       if (runtime === 'cursor') return cwd ? cursorSource.archiveThread(threadId, cwd) : false;
       if (runtime === 'zcode') return cwd ? zcodeSource.archiveThread(threadId, cwd) : false;
@@ -347,6 +411,7 @@ export function createUiSessionRegistry(
   kimiSource: UiSessionKimiSource = defaultUiSessionKimiSource,
   cursorSource: UiSessionCursorSource = defaultUiSessionCursorSource,
   zcodeSource: UiSessionZcodeSource = defaultUiSessionZcodeSource,
+  antigravitySource: UiSessionAntigravitySource = defaultUiSessionAntigravitySource,
 ): SessionRegistryService {
   return new SessionRegistryService(store, {
     codexThreads: {
@@ -398,6 +463,15 @@ export function createUiSessionRegistry(
           : null;
       },
       archiveThread: (zcodeSessionId, cwd) => zcodeSource.archiveThread(zcodeSessionId, cwd),
+    },
+    antigravityThreads: {
+      getThread(antigravitySessionId, cwd) {
+        const session = antigravitySource.getThread(antigravitySessionId, cwd);
+        return session
+          ? { antigravitySessionId: session.sessionId, title: session.title || session.sessionId.slice(0, 8), cwd: session.cwd || cwd }
+          : null;
+      },
+      archiveThread: (antigravitySessionId, cwd) => antigravitySource.archiveThread(antigravitySessionId, cwd),
     },
     readDefaultModel: () => codexSource.readDefaultModel(),
     defaultWorkingDirectory: () => codexSource.defaultWorkingDirectory(),

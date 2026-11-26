@@ -59,10 +59,15 @@ import {
   findZcodeSessionById,
 } from '../../runtime/zcode/session-index.js';
 import {
+  archiveAntigravitySession,
+  findAntigravitySessionById,
+} from '../../runtime/antigravity/session-index.js';
+import {
   kimiTmuxSessionName,
 } from '../../runtime/kimi/tmux-provider.js';
 import { cursorTmuxSessionName } from '../../runtime/cursor/tmux-provider.js';
 import { closeCursorAcpSessions } from '../../runtime/cursor/acp-provider.js';
+import { closeAllAntigravityAcpSessions } from '../../runtime/antigravity/acp-provider.js';
 import { zcodeTmuxSessionName } from '../../runtime/zcode/tmux-provider.js';
 import {
   sanitizeInput,
@@ -173,6 +178,8 @@ import {
   getSessionCursorSessionId,
   getSessionZcodeCwd,
   getSessionZcodeSessionId,
+  getSessionAntigravityCwd,
+  getSessionAntigravitySessionId,
   getSessionActiveRuntime,
   getSessionSystemPrompt,
   getSessionWorkingDirectory,
@@ -770,7 +777,7 @@ function parseMirrorCodexSelectionSessionId(permissionRequestId: string): string
 function sessionSupportsTmuxSelectionPromptProbe(session: BridgeSession): boolean {
   if (session.runtime?.codex?.appServerEndpoint || getCodexAppServerSession(session.id)) return false;
   const activeRuntime = getSessionActiveRuntime(session);
-  if (activeRuntime === 'kimi' || activeRuntime === 'cursor' || activeRuntime === 'zcode') return false;
+  if (activeRuntime === 'kimi' || activeRuntime === 'cursor' || activeRuntime === 'zcode' || activeRuntime === 'antigravity') return false;
   if (activeRuntime === 'claude') return resolveEffectiveClaudeProvider(session) === 'tmux';
   return true;
 }
@@ -778,7 +785,7 @@ function sessionSupportsTmuxSelectionPromptProbe(session: BridgeSession): boolea
 function sessionSupportsCodexTuiRuntimeSignals(session: BridgeSession): boolean {
   if (session.runtime?.codex?.appServerEndpoint || getCodexAppServerSession(session.id)) return false;
   const activeRuntime = getSessionActiveRuntime(session);
-  if (activeRuntime === 'kimi' || activeRuntime === 'claude' || activeRuntime === 'cursor' || activeRuntime === 'zcode') return false;
+  if (activeRuntime === 'kimi' || activeRuntime === 'claude' || activeRuntime === 'cursor' || activeRuntime === 'zcode' || activeRuntime === 'antigravity') return false;
   return true;
 }
 
@@ -3139,6 +3146,7 @@ export async function stop(): Promise<void> {
   // Stop all adapters
   await closeCodexAppServerSessions();
   await closeCursorAcpSessions();
+  await closeAllAntigravityAcpSessions();
   closeAppServerRequestObservers();
   clearCursorQuestions();
   clearCursorAcpQuestions();
@@ -3569,6 +3577,10 @@ function formatLifecycleArchiveDetail(result: Awaited<ReturnType<typeof archiveL
       return result.zcodeSessionId
         ? `archived ZCode session ${result.zcodeSessionId.slice(0, 8)}`
         : 'archived ZCode session';
+    case 'antigravity_archive':
+      return result.antigravitySessionId
+        ? `archived Antigravity session ${result.antigravitySessionId.slice(0, 8)}`
+        : 'archived Antigravity session';
     case 'bridge_delete':
       return 'deleted BridgeSession';
     case 'binding_delete':
@@ -4285,6 +4297,10 @@ function createLifecycleSessionRegistry(store: BridgeStore): SessionRegistryServ
         return session ? archiveZcodeSession(session) : false;
       },
     },
+    antigravityThreads: {
+      getThread: () => null,
+      archiveThread: (antigravitySessionId, cwd) => Boolean(archiveAntigravitySession(antigravitySessionId, cwd)),
+    },
   });
 }
 
@@ -4292,7 +4308,7 @@ async function archiveLifecycleBindingSession(
   store: BridgeStore,
   binding: ChannelChat,
 ): Promise<{
-  action: 'codex_archive' | 'claude_archive' | 'kimi_archive' | 'cursor_archive' | 'zcode_archive' | 'bridge_delete' | 'delete_after_archive_failure' | 'binding_delete';
+  action: 'codex_archive' | 'claude_archive' | 'kimi_archive' | 'cursor_archive' | 'zcode_archive' | 'antigravity_archive' | 'bridge_delete' | 'delete_after_archive_failure' | 'binding_delete';
   codexThreadId?: string;
   claudeSessionId?: string;
   claudeCwd?: string;
@@ -4302,6 +4318,8 @@ async function archiveLifecycleBindingSession(
   cursorCwd?: string;
   zcodeSessionId?: string;
   zcodeCwd?: string;
+  antigravitySessionId?: string;
+  antigravityCwd?: string;
   deletedBridgeSessionIds: string[];
   tmuxSessionNames: string[];
   tmuxCleanupCommands: string[];
@@ -4331,6 +4349,8 @@ async function archiveLifecycleBindingSession(
   const cursorCwd = activeRuntime === 'cursor' ? getSessionCursorCwd(session) || getSessionWorkingDirectory(session) || undefined : undefined;
   const zcodeSessionId = activeRuntime === 'zcode' ? getSessionZcodeSessionId(session) || undefined : undefined;
   const zcodeCwd = activeRuntime === 'zcode' ? getSessionZcodeCwd(session) || getSessionWorkingDirectory(session) || undefined : undefined;
+  const antigravitySessionId = activeRuntime === 'antigravity' ? getSessionAntigravitySessionId(session) || undefined : undefined;
+  const antigravityCwd = activeRuntime === 'antigravity' ? getSessionAntigravityCwd(session) || getSessionWorkingDirectory(session) || undefined : undefined;
   const tmuxCleanup = await cleanupLifecycleTmuxSessions(store, session, {
     codexThreadId,
     claudeSessionId,
@@ -4341,6 +4361,8 @@ async function archiveLifecycleBindingSession(
     cursorCwd,
     zcodeSessionId,
     zcodeCwd,
+    antigravitySessionId,
+    antigravityCwd,
   });
   try {
     if (codexThreadId) {
@@ -4392,6 +4414,16 @@ async function archiveLifecycleBindingSession(
         ...tmuxCleanup,
       };
     }
+    if (antigravitySessionId && antigravityCwd) {
+      const result = registry.archiveAntigravityThread(antigravitySessionId, antigravityCwd);
+      return {
+        action: 'antigravity_archive',
+        antigravitySessionId,
+        antigravityCwd,
+        deletedBridgeSessionIds: result.deletedBridgeSessionIds,
+        ...tmuxCleanup,
+      };
+    }
 
     const result = registry.deleteBridgeSession(session.id);
     return {
@@ -4413,6 +4445,8 @@ async function archiveLifecycleBindingSession(
       cursorCwd,
       zcodeSessionId,
       zcodeCwd,
+      antigravitySessionId,
+      antigravityCwd,
       deletedBridgeSessionIds: [session.id],
       ...tmuxCleanup,
       error,
@@ -4433,6 +4467,8 @@ async function cleanupLifecycleTmuxSessions(
     cursorCwd?: string;
     zcodeSessionId?: string;
     zcodeCwd?: string;
+    antigravitySessionId?: string;
+    antigravityCwd?: string;
   },
 ): Promise<{
   tmuxSessionNames: string[];
@@ -4464,6 +4500,11 @@ async function cleanupLifecycleTmuxSessions(
           && getSessionZcodeSessionId(candidate) === identity.zcodeSessionId
           && getSessionZcodeCwd(candidate) === identity.zcodeCwd;
       }
+      if (identity.antigravitySessionId && identity.antigravityCwd) {
+        return getSessionActiveRuntime(candidate) === 'antigravity'
+          && getSessionAntigravitySessionId(candidate) === identity.antigravitySessionId
+          && getSessionAntigravityCwd(candidate) === identity.antigravityCwd;
+      }
       return candidate.id === session.id;
     });
   const targets = linkedSessions.length > 0 ? linkedSessions : [session];
@@ -4474,6 +4515,7 @@ async function cleanupLifecycleTmuxSessions(
 
   for (const target of targets) {
     const activeRuntime = getSessionActiveRuntime(target);
+    if (activeRuntime === 'antigravity') continue;
     const tmuxSessionName = getSessionRuntimeTmuxSessionName(target)
       || (activeRuntime === 'kimi'
         ? kimiTmuxSessionName(target.id)
@@ -5266,6 +5308,7 @@ async function handleMessage(
     && (tmuxProviderRuntime.runtime !== 'cursor'
       || (tmuxProviderActiveTask && resolveCursorTransport(tmuxProviderSession) === 'cli'))
     && tmuxProviderRuntime.runtime !== 'zcode'
+    && tmuxProviderRuntime.runtime !== 'antigravity'
     && !tmuxProviderSession.runtime?.codex?.appServerEndpoint
   ) {
     const tmuxProviderChat = tmuxProviderBinding;

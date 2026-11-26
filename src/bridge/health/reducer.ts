@@ -2,6 +2,8 @@ import type { BridgeSession, BridgeSessionHealthStatus, RuntimeAgent } from '../
 import type { ThreadProcessProbeResult } from './process.js';
 import {
   getSessionActiveRuntime,
+  getSessionAntigravityCwd,
+  getSessionAntigravitySessionId,
   getSessionClaudeCwd,
   getSessionClaudeSessionId,
   getSessionCodexThreadId,
@@ -254,7 +256,9 @@ export function computeBaseDiagnosis(
         ? trimOrNull(getSessionCursorSessionId(session))
         : activeRuntime === 'zcode'
           ? trimOrNull(getSessionZcodeSessionId(session))
-      : codexThreadId;
+          : activeRuntime === 'antigravity'
+            ? trimOrNull(getSessionAntigravitySessionId(session))
+            : codexThreadId;
   const runtimeIdentityCwd = activeRuntime === 'kimi'
     ? trimOrNull(getSessionKimiCwd(session)) || trimOrNull(getSessionWorkingDirectory(session))
     : activeRuntime === 'claude'
@@ -263,7 +267,9 @@ export function computeBaseDiagnosis(
         ? trimOrNull(getSessionCursorCwd(session)) || trimOrNull(getSessionWorkingDirectory(session))
         : activeRuntime === 'zcode'
           ? trimOrNull(getSessionZcodeCwd(session)) || trimOrNull(getSessionWorkingDirectory(session))
-      : null;
+          : activeRuntime === 'antigravity'
+            ? trimOrNull(getSessionAntigravityCwd(session)) || trimOrNull(getSessionWorkingDirectory(session))
+            : null;
   const lastProgressMs = parseIsoMs(lastProgressAt || undefined);
   const previousStatus = session.health_status || 'idle';
 

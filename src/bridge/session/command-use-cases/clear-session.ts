@@ -18,6 +18,7 @@ import {
 import { kimiTmuxSessionName } from '../../../runtime/kimi/tmux-provider.js';
 import { cursorTmuxSessionName } from '../../../runtime/cursor/tmux-provider.js';
 import { zcodeTmuxSessionName } from '../../../runtime/zcode/tmux-provider.js';
+import { closeAntigravityAcpSession } from '../../../runtime/antigravity/acp-provider.js';
 import { getSessionDisplayName } from '../display/session-title.js';
 import {
   buildCommandFields,
@@ -156,7 +157,13 @@ export async function handleClearSessionCommand(options: {
     if (options.store.getChannelChat(options.msg.address.channelType, options.msg.address.chatId)?.bridgeSessionId !== previousSession.id) {
       return { response: '处理期间当前聊天已切换会话，未覆盖新的绑定。' };
     }
-  } else if (previousRuntimeTmuxSessionName) {
+  } else if (previousRuntime === 'antigravity' && previousSession) {
+    try {
+      await closeAntigravityAcpSession(previousSession.id);
+    } catch (error) {
+      cleanupNotes.push(`旧 Antigravity ACP 连接清理失败：${error instanceof Error ? error.message : String(error)}`);
+    }
+  } else if (previousRuntimeTmuxSessionName && previousRuntime !== 'antigravity') {
     const cleanup = await cleanupRuntimeTmuxSession({
       runtime: previousRuntime,
       sessionName: previousRuntimeTmuxSessionName,

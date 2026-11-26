@@ -11,6 +11,7 @@ import {
   getSessionCursorSessionId,
   getSessionKimiSessionId,
   getSessionZcodeSessionId,
+  getSessionAntigravitySessionId,
   getSessionWorkingDirectory,
 } from '../../domain/session-runtime.js';
 import type { RuntimeAgent } from '../../domain/session.js';
@@ -143,6 +144,8 @@ export class CommandThreadDisplay {
             ? getSessionCursorSessionId(session)
             : activeRuntime === 'zcode'
               ? getSessionZcodeSessionId(session)
+              : activeRuntime === 'antigravity'
+                ? getSessionAntigravitySessionId(session)
           : getBridgeSessionCodexThreadId(session);
       if (!threadId) continue;
       statesByThreadId.set(threadId, {
@@ -224,6 +227,8 @@ export class CommandThreadDisplay {
               ? getSessionCursorSessionId(session) || ''
               : activeRuntime === 'zcode'
                 ? getSessionZcodeSessionId(session) || ''
+                : activeRuntime === 'antigravity'
+                  ? getSessionAntigravitySessionId(session) || ''
             : '';
         return {
           title: display.title,
@@ -234,7 +239,7 @@ export class CommandThreadDisplay {
           bindingId: anyBinding ? anyBinding.id : '',
           active: Boolean(binding),
           originator: runtimeSessionId
-            ? activeRuntime === 'kimi' ? 'Kimi Code' : activeRuntime === 'cursor' ? 'Cursor Agent' : activeRuntime === 'zcode' ? 'ZCode' : 'Claude Code'
+            ? activeRuntime === 'kimi' ? 'Kimi Code' : activeRuntime === 'cursor' ? 'Cursor Agent' : activeRuntime === 'zcode' ? 'ZCode' : activeRuntime === 'antigravity' ? 'Antigravity' : 'Claude Code'
             : binding ? display.originator : 'Bridge',
         };
       })

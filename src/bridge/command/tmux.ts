@@ -1608,7 +1608,7 @@ export async function handleTmuxBridgeCommand(params: HandleTmuxBridgeCommandPar
       const appServerView = backendStatus.terminal === 'view'
         && backendStatus.terminalName === captureTarget;
       const inspected = await inspectRuntimeTmuxSession({
-        runtime: runtimeProvider.provider === 'tmux'
+        runtime: runtimeProvider.provider === 'tmux' && runtimeProvider.runtime !== 'antigravity'
           ? runtimeProvider.runtime
           : undefined,
         sessionName: captureTarget,
@@ -1642,7 +1642,7 @@ export async function handleTmuxBridgeCommand(params: HandleTmuxBridgeCommandPar
           key: params.screenMonitor.key,
           target: captureTarget,
           lines,
-          runtime: runtimeProvider.provider === 'tmux'
+          runtime: runtimeProvider.provider === 'tmux' && runtimeProvider.runtime !== 'antigravity'
             ? runtimeProvider.runtime
             : undefined,
           appServerView,
@@ -1827,9 +1827,10 @@ export async function handleTmuxBridgeCommand(params: HandleTmuxBridgeCommandPar
         : actions;
       if (params.suppressSuccessfulResponse === true) {
         const runtimeProvider = resolveEffectiveRuntimeProvider(effectiveSession, binding);
-        if (runtimeProvider.provider === 'tmux') {
+        if (runtimeProvider.provider === 'tmux' && runtimeProvider.runtime !== 'antigravity') {
+          const tmuxRuntime = runtimeProvider.runtime;
           const submitProviderInput = () => sendRuntimeTmuxInput({
-            runtime: runtimeProvider.runtime,
+            runtime: tmuxRuntime,
             sessionName: target,
             send: () => sendTmuxActions(target, actionsToSend, {
               delayMs: SEND_ACTION_DELAY_MS,
@@ -1943,6 +1944,7 @@ export async function handleTmuxBridgeCommand(params: HandleTmuxBridgeCommandPar
       const lines = getCaptureLines(session);
       const manualRuntime = getSessionActiveRuntime(effectiveSession);
       const manualActions = manualRuntime
+        && manualRuntime !== 'antigravity'
         && resolveRuntimeTmuxSteerOperation(manualRuntime, target) === 'explicit'
         ? [...actionsToSend, { type: 'key' as const, key: 'C-s' }]
         : actionsToSend;

@@ -33,10 +33,17 @@ import {
   resolveKimiRuntimeConfig,
   resolveCursorRuntimeConfig,
   resolveZcodeRuntimeConfig,
+  resolveAntigravityRuntimeConfig,
   resolveSessionWorkingDirectoryPath,
 } from '../session/support.js';
 import type { BridgeSession, BridgeStore } from '../../domain/index.js';
-import type { CursorReasoningEffort, KimiThinkingMode, ZcodeMode } from '../../domain/session.js';
+import type {
+  AntigravityMode,
+  AntigravityReasoningEffort,
+  CursorReasoningEffort,
+  KimiThinkingMode,
+  ZcodeMode,
+} from '../../domain/session.js';
 import { parseMode } from '../../shared/security/validators.js';
 import {
   getSessionActiveRuntime,
@@ -88,11 +95,12 @@ export {
 } from './runtime-session.js';
 
 const MODE_OPTIONS_TEXT = '可选：`normal`（普通执行，默认） `yolo`（YOLO模式：允许 agent 无需审批绕过沙箱）。';
-const RUNTIME_OPTIONS_TEXT = '可选：`codex`（OpenAI Codex，默认） `claude`（Claude Code） `kimi`（Kimi Code） `cursor`（Cursor Agent） `zcode`（ZCode）。`/provider` 选择使用何种方式运行 agent，不切换 runtime。';
+const RUNTIME_OPTIONS_TEXT = '可选：`codex`（OpenAI Codex，默认） `claude`（Claude Code） `kimi`（Kimi Code） `cursor`（Cursor Agent） `zcode`（ZCode） `antigravity`（Google Antigravity，别名 `agy`）。`/provider` 选择使用何种方式运行 agent，不切换 runtime。';
 const REASONING_OPTIONS_TEXT = '可选：`1=minimal` `2=low` `3=medium` `4=high` `5=xhigh` `6=max` `7=ultra`；`m=max`，`u=ultra`。';
 const CLAUDE_REASONING_OPTIONS_TEXT = '可选：`1=low` `2=medium` `3=high` `4=xhigh` `5=max`；`m` 等同于 `max`，`minimal` 会映射为 Claude Code `low`。';
 const KIMI_THINKING_OPTIONS_TEXT = 'Kimi Code 只支持 Thinking 开关：`on`、`off`、`default`；`high` 等同于 `on`。';
 const CURSOR_REASONING_OPTIONS_TEXT = 'Cursor 的 effort 是模型参数，可选：`low`、`medium`、`high`、`xhigh`、`max`；实际可用值由所选模型和账号决定。';
+const ANTIGRAVITY_REASONING_OPTIONS_TEXT = 'Antigravity 思考级别可选：`low`、`medium`、`high`、`xhigh`（也支持 `1=low` `2=medium` `3=high` `4=xhigh`），发送 `/r default` 恢复默认。';
 const SANDBOX_OPTIONS_TEXT = '可选：`read-only` `workspace-write` `danger-full-access` `default`（回到全局默认）';
 const NETWORK_OPTIONS_TEXT = '可选：`on`/`true` 开启网络，`off`/`false` 关闭网络，`default` 回到全局默认。';
 const CLAUDE_PTY_RUNTIME_UPDATE_NOTE = '已保存为当前会话的 Claude Code 启动配置；如果 Claude Code pty 已经启动，不会向运行中的 TUI 注入切换命令，下一条普通消息会按新参数启动或重启 Claude Code pty。';
@@ -157,6 +165,25 @@ function parseCursorReasoningCommandArg(raw: string): CursorReasoningEffort | un
   return ['low', 'medium', 'high', 'xhigh', 'max'].includes(normalized)
     ? normalized as CursorReasoningEffort
     : undefined;
+}
+
+function parseAntigravityReasoningCommandArg(raw: string): AntigravityReasoningEffort | undefined {
+  const normalized = raw.trim().toLowerCase();
+  if (normalized === '1' || normalized === 'minimal' || normalized === 'low') return 'low';
+  if (normalized === '2' || normalized === 'medium') return 'medium';
+  if (normalized === '3' || normalized === 'high') return 'high';
+  if (normalized === '4' || normalized === 'xhigh' || normalized === 'max') return 'xhigh';
+  return undefined;
+}
+
+function parseAntigravityModeCommandArg(raw: string): AntigravityMode | undefined {
+  const normalized = raw.trim().toLowerCase();
+  if (normalized === 'default' || normalized === 'normal') return 'default';
+  if (normalized === 'accept-edits' || normalized === 'accept_edits' || normalized === 'edit') return 'accept-edits';
+  if (normalized === 'auto') return 'auto';
+  if (normalized === 'plan') return 'plan';
+  if (normalized === 'yolo') return 'yolo';
+  return undefined;
 }
 
 function setSessionCodexReasoningToml(sessionId: string, reasoningEffort: CodexReasoningEffort): void {
@@ -337,6 +364,55 @@ function setSessionZcodeModeToml(sessionId: string, mode: ZcodeMode): void {
   );
 }
 
+function setSessionAntigravityModelToml(sessionId: string, model: string): void {
+  createConfigService({ migrate: false }).set(
+    { kind: 'session', sessionId },
+    { runtime: { antigravity: { model } } },
+  );
+}
+
+function clearSessionAntigravityModelToml(sessionId: string): void {
+  createConfigService({ migrate: false }).unset(
+    { kind: 'session', sessionId },
+    'runtime.antigravity.model',
+  );
+}
+
+function setSessionAntigravityModeToml(sessionId: string, mode: AntigravityMode): void {
+  createConfigService({ migrate: false }).set(
+    { kind: 'session', sessionId },
+    { runtime: { antigravity: { mode } } },
+  );
+}
+
+function setSessionAntigravityReasoningToml(sessionId: string, reasoningEffort: AntigravityReasoningEffort): void {
+  createConfigService({ migrate: false }).set(
+    { kind: 'session', sessionId },
+    { runtime: { antigravity: { reasoningEffort } } },
+  );
+}
+
+function clearSessionAntigravityReasoningToml(sessionId: string): void {
+  createConfigService({ migrate: false }).unset(
+    { kind: 'session', sessionId },
+    'runtime.antigravity.reasoningEffort',
+  );
+}
+
+function setSessionAntigravitySandboxToml(sessionId: string, sandbox: boolean): void {
+  createConfigService({ migrate: false }).set(
+    { kind: 'session', sessionId },
+    { runtime: { antigravity: { sandbox } } },
+  );
+}
+
+function clearSessionAntigravitySandboxToml(sessionId: string): void {
+  createConfigService({ migrate: false }).unset(
+    { kind: 'session', sessionId },
+    'runtime.antigravity.sandbox',
+  );
+}
+
 function clearSessionKimiModelToml(sessionId: string): void {
   createConfigService({ migrate: false }).unset(
     { kind: 'session', sessionId },
@@ -394,6 +470,15 @@ export function handleReasoningCommand(options: {
     return CURSOR_DESKTOP_MODEL_CONTROL_NOTICE;
   }
   if (!options.args) {
+    if (activeRuntime === 'antigravity') {
+      const agyConfig = resolveAntigravityRuntimeConfig(session, options.binding);
+      return buildCommandFields(
+        '当前 Antigravity 思考级别',
+        [['级别', agyConfig.reasoningEffort || 'default'], ['模型', agyConfig.model || 'default']],
+        [ANTIGRAVITY_REASONING_OPTIONS_TEXT, '修改会通过 ACP `thought_level` 配置应用到下一轮请求。'],
+        options.markdown,
+      );
+    }
     if (activeRuntime === 'cursor') {
       const cursorConfig = resolveCursorRuntimeConfig(session, options.binding);
       return buildCommandFields(
@@ -430,6 +515,15 @@ export function handleReasoningCommand(options: {
     );
   }
   if (options.args.trim().toLowerCase() === 'default' || options.args.trim().toLowerCase() === 'reset') {
+    if (activeRuntime === 'antigravity') {
+      clearSessionAntigravityReasoningToml(session.id);
+      return buildCommandFields(
+        '已恢复默认 Antigravity 思考级别',
+        [['级别', resolveAntigravityRuntimeConfig(options.store.getSession(session.id), options.binding).reasoningEffort || 'default']],
+        ['当前会话已清除 Antigravity 思考级别覆盖值，后续请求会跟随全局默认值。'],
+        options.markdown,
+      );
+    }
     if (activeRuntime === 'cursor') {
       clearSessionCursorReasoningToml(session.id);
       return buildCommandFields(
@@ -463,6 +557,24 @@ export function handleReasoningCommand(options: {
       [['级别', formatReasoningEffort(resolveEffectiveReasoningEffort(options.store.getSession(session.id)))]],
       ['当前 BridgeSession 已清除 Codex reasoning 覆盖值，后续请求会跟随全局 Codex 默认值。',
         hasBoundCodexAppServer(session) ? CODEX_APP_SERVER_UPDATE_NOTE : CODEX_RUNTIME_UPDATE_NOTE],
+      options.markdown,
+    );
+  }
+  if (activeRuntime === 'antigravity') {
+    const agyReasoning = parseAntigravityReasoningCommandArg(options.args);
+    if (!agyReasoning) {
+      return buildCommandFields(
+        'Antigravity 思考级别用法',
+        [['命令', '`/reasoning low|medium|high|xhigh|default`']],
+        [ANTIGRAVITY_REASONING_OPTIONS_TEXT],
+        options.markdown,
+      );
+    }
+    setSessionAntigravityReasoningToml(session.id, agyReasoning);
+    return buildCommandFields(
+      '已更新 Antigravity 思考级别',
+      [['级别', agyReasoning]],
+      ['下一轮 Antigravity ACP 请求会通过 `session/set_config_option` 应用该思考级别。'],
       options.markdown,
     );
   }
@@ -560,6 +672,37 @@ export function handleModeCommand(options: {
   const session = options.store.getSession(binding.bridgeSessionId);
   const activeRuntime = getSessionActiveRuntime(session) || 'codex';
   const mode = formatSessionRuntimeMode(binding, session);
+  if (activeRuntime === 'antigravity') {
+    const current = resolveAntigravityRuntimeConfig(session, binding).mode;
+    if (!options.args) {
+      return buildCommandFields(
+        '当前 Antigravity 模式',
+        [['Runtime', 'antigravity'], ['模式', current], ['Provider', 'acp']],
+        ['可选：`default`（默认审批） `accept-edits`（自动接受编辑） `auto`（自动模式） `plan`（只读规划） `yolo`（`--dangerously-skip-permissions` 跳过所有审批）。'],
+        options.markdown,
+      );
+    }
+    const requested = parseAntigravityModeCommandArg(options.args);
+    if (!requested) {
+      return buildCommandFields(
+        'Antigravity 模式用法',
+        [['命令', '`/mode default|accept-edits|auto|plan|yolo`']],
+        ['`normal` 会映射为 `default`。'],
+        options.markdown,
+      );
+    }
+    setSessionAntigravityModeToml(session!.id, requested);
+    return buildCommandFields(
+      '已更新 Antigravity 模式',
+      [['模式', requested], ['Provider', 'acp']],
+      [
+        requested === 'yolo'
+          ? '后续 Antigravity ACP 请求将以 `--dangerously-skip-permissions` 模式运行，无需审批。'
+          : '修改将在下一轮 Antigravity ACP 请求中生效。',
+      ],
+      options.markdown,
+    );
+  }
   if (activeRuntime === 'zcode') {
     const current = resolveZcodeRuntimeConfig(session, binding).mode;
     if (!options.args) {
@@ -682,8 +825,15 @@ export function handleYoloCommand(options: Parameters<typeof handleModeCommand>[
   if (runtime === 'kimi') {
     return 'Kimi Code 当前固定使用 `kimi -y`；无法通过 `/yolo off` 关闭，未修改其他 runtime 的配置。';
   }
-  return handleModeCommand({ ...options, currentBinding: binding,
-    args: runtime === 'zcode' && value === 'normal' ? 'build' : value });
+  return handleModeCommand({
+    ...options,
+    currentBinding: binding,
+    args: runtime === 'zcode' && value === 'normal'
+      ? 'build'
+      : runtime === 'antigravity' && value === 'normal'
+        ? 'default'
+        : value,
+  });
 }
 
 export function handleChangeDirectoryCommand(options: {
@@ -760,7 +910,8 @@ export function handleRuntimeCommand(options: {
   if (!session) {
     return '当前会话不存在，无法切换 runtime。';
   }
-  const requested = options.args.trim().toLowerCase();
+  const rawRequested = options.args.trim().toLowerCase();
+  const requested = rawRequested === 'agy' ? 'antigravity' : rawRequested;
   const currentRuntime = getSessionActiveRuntime(session) || 'codex';
   if (!requested) {
     return buildCommandFields(
@@ -770,16 +921,16 @@ export function handleRuntimeCommand(options: {
       options.markdown,
     );
   }
-  if (requested !== 'codex' && requested !== 'claude' && requested !== 'kimi' && requested !== 'cursor' && requested !== 'zcode') {
+  if (requested !== 'codex' && requested !== 'claude' && requested !== 'kimi' && requested !== 'cursor' && requested !== 'zcode' && requested !== 'antigravity') {
     return buildCommandFields(
       'Runtime 用法',
-      [['命令', '`/runtime codex|claude|kimi|cursor|zcode`']],
+      [['命令', '`/runtime codex|claude|kimi|cursor|zcode|antigravity`']],
       [RUNTIME_OPTIONS_TEXT],
       options.markdown,
     );
   }
   if (requested === currentRuntime) {
-    const label = requested === 'claude' ? 'Claude Code' : requested === 'kimi' ? 'Kimi Code' : requested === 'cursor' ? 'Cursor Agent' : requested === 'zcode' ? 'ZCode' : 'Codex';
+    const label = requested === 'claude' ? 'Claude Code' : requested === 'kimi' ? 'Kimi Code' : requested === 'cursor' ? 'Cursor Agent' : requested === 'zcode' ? 'ZCode' : requested === 'antigravity' ? 'Antigravity' : 'Codex';
     return buildCommandFields(
       'Runtime 未变化',
       [['Runtime', currentRuntime]],
@@ -830,7 +981,7 @@ export function handleRuntimeCommand(options: {
       ['新 BridgeSession', nextSession.id],
       ['目录', getSessionWorkingDirectory(nextSession) || '-'],
     ],
-    [`当前聊天已切到独立 ${requested === 'claude' ? 'Claude Code' : requested === 'kimi' ? 'Kimi Code' : requested === 'cursor' ? 'Cursor Agent' : requested === 'zcode' ? 'ZCode' : 'Codex'} BridgeSession；其它 runtime 会话不会参与后续 turn。再次使用 \`/runtime codex|claude|kimi|cursor|zcode\` 会切回本聊天记住的对应 BridgeSession。`],
+    [`当前聊天已切到独立 ${requested === 'claude' ? 'Claude Code' : requested === 'kimi' ? 'Kimi Code' : requested === 'cursor' ? 'Cursor Agent' : requested === 'zcode' ? 'ZCode' : requested === 'antigravity' ? 'Antigravity' : 'Codex'} BridgeSession；其它 runtime 会话不会参与后续 turn。再次使用 \`/runtime codex|claude|kimi|cursor|zcode|antigravity\` 会切回本聊天记住的对应 BridgeSession。`],
     options.markdown,
   );
 }
@@ -848,6 +999,42 @@ export function handleSandboxCommand(options: {
     return '当前会话不存在。';
   }
   const activeRuntime = getSessionActiveRuntime(session);
+  if (activeRuntime === 'antigravity') {
+    const current = resolveAntigravityRuntimeConfig(session, binding).sandbox;
+    if (!options.args) {
+      return buildCommandFields(
+        '当前 Antigravity 沙箱',
+        [['沙箱', current ? 'on' : 'off']],
+        ['可选：`on`（启用 `agy --sandbox`） `off`（关闭） `default`（恢复全局默认）。'],
+        options.markdown,
+      );
+    }
+    const parsed = parseNetworkAccessArg(options.args);
+    if (parsed === null) {
+      return buildCommandFields(
+        'Antigravity 沙箱用法',
+        [['命令', '`/sandbox on|off|default`']],
+        ['控制启动 `agy acp` 时是否传入 `--sandbox`。'],
+        options.markdown,
+      );
+    }
+    if (parsed === 'default') {
+      clearSessionAntigravitySandboxToml(session.id);
+      return buildCommandFields(
+        '已恢复默认 Antigravity 沙箱',
+        [['沙箱', resolveAntigravityRuntimeConfig(options.store.getSession(session.id), binding).sandbox ? 'on' : 'off']],
+        ['后续 Antigravity ACP 进程启动时会跟随全局默认值。'],
+        options.markdown,
+      );
+    }
+    setSessionAntigravitySandboxToml(session.id, parsed);
+    return buildCommandFields(
+      '已更新 Antigravity 沙箱',
+      [['沙箱', parsed ? 'on' : 'off']],
+      ['后续启动 Antigravity ACP 进程时会应用该 `--sandbox` 设置。'],
+      options.markdown,
+    );
+  }
   if (activeRuntime === 'claude' || activeRuntime === 'kimi' || activeRuntime === 'cursor' || activeRuntime === 'zcode') {
     const label = activeRuntime === 'kimi' ? 'Kimi Code' : activeRuntime === 'cursor' ? 'Cursor Agent' : activeRuntime === 'zcode' ? 'ZCode' : 'Claude Code';
     return buildCommandFields(
@@ -910,8 +1097,8 @@ export function handleNetworkCommand(options: {
     return '当前会话不存在。';
   }
   const activeRuntime = getSessionActiveRuntime(session);
-  if (activeRuntime === 'claude' || activeRuntime === 'kimi' || activeRuntime === 'cursor' || activeRuntime === 'zcode') {
-    const label = activeRuntime === 'kimi' ? 'Kimi Code' : activeRuntime === 'cursor' ? 'Cursor Agent' : activeRuntime === 'zcode' ? 'ZCode' : 'Claude Code';
+  if (activeRuntime === 'claude' || activeRuntime === 'kimi' || activeRuntime === 'cursor' || activeRuntime === 'zcode' || activeRuntime === 'antigravity') {
+    const label = activeRuntime === 'kimi' ? 'Kimi Code' : activeRuntime === 'cursor' ? 'Cursor Agent' : activeRuntime === 'zcode' ? 'ZCode' : activeRuntime === 'antigravity' ? 'Antigravity' : 'Claude Code';
     return buildCommandFields(
       `${label} 不支持 Bridge 网络开关`,
       [['Runtime', activeRuntime]],
@@ -982,6 +1169,34 @@ export function handleModelCommand(options: {
     return '当前会话不存在。';
   }
   const activeRuntime = getSessionActiveRuntime(session) || 'codex';
+  if (activeRuntime === 'antigravity') {
+    const currentModel = resolveAntigravityRuntimeConfig(session, binding).model || 'default';
+    if (!options.args) {
+      return buildCommandFields(
+        '当前 Antigravity 模型',
+        [['模型', currentModel]],
+        ['发送 `/model <model-id>` 可切换（例如 `gemini-3.1-pro`、`claude-sonnet-4-6` 等）；发送 `/model default` 回到默认模型。'],
+        options.markdown,
+      );
+    }
+    const requestedModel = options.args.trim();
+    if (requestedModel === 'default') {
+      clearSessionAntigravityModelToml(session.id);
+      return buildCommandFields(
+        '已恢复默认 Antigravity 模型',
+        [['模型', resolveAntigravityRuntimeConfig(options.store.getSession(session.id), binding).model || 'default']],
+        ['下一轮 Antigravity ACP 请求会跟随全局/CLI 默认模型。'],
+        options.markdown,
+      );
+    }
+    setSessionAntigravityModelToml(session.id, requestedModel);
+    return buildCommandFields(
+      '已更新 Antigravity 模型',
+      [['模型', requestedModel]],
+      [`下一轮 Antigravity ACP 请求会通过 \`session/set_config_option\` 切换到模型 \`${requestedModel}\`。`],
+      options.markdown,
+    );
+  }
   if (activeRuntime === 'zcode') {
     const currentModel = resolveZcodeRuntimeConfig(session, binding).model || 'default';
     if (!options.args) {

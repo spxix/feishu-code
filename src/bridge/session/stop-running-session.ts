@@ -1,5 +1,6 @@
 import { stopCursorDesktopThread } from '../../runtime/cursor/desktop-bridge-client.js';
 import { interruptCursorAcpSession } from '../../runtime/cursor/acp-provider.js';
+import { interruptAntigravityAcpSession } from '../../runtime/antigravity/acp-provider.js';
 import { resolveCursorTransport } from './cursor-transport.js';
 import type { BridgeSession, BridgeStore, ChannelChat } from '../../domain/index.js';
 import { getSessionCursorSessionId, getSessionClaudeSessionId, getSessionCodexThreadId, getSessionRuntimeTmuxSessionName } from '../../domain/session-runtime.js';
@@ -36,7 +37,7 @@ export function getProviderOwnedRuntimeTmuxTarget(
 ): { sessionName: string; runtime: 'codex' | 'claude' | 'kimi' | 'cursor' | 'zcode' } | undefined {
   if (!session || session.id !== binding.bridgeSessionId) return undefined;
   const provider = resolveEffectiveRuntimeProvider(session, binding);
-  if (provider.provider !== 'tmux' || resolveCursorTransport(session) === 'desktop') return undefined;
+  if (provider.runtime === 'antigravity' || provider.provider !== 'tmux' || resolveCursorTransport(session) === 'desktop') return undefined;
   if (provider.runtime === 'codex'
     && (session.runtime?.codex?.appServerEndpoint || getCodexAppServerSession(session.id))) return undefined;
   const sessionName = getSessionRuntimeTmuxSessionName(session);
@@ -59,7 +60,7 @@ function tmuxInterruptTarget(session: BridgeSession | null | undefined, binding:
   // before its attachment metadata has been written. Do not infer an idle target.
   if (!session || session.id !== binding.bridgeSessionId || !hasActiveTask || getSessionRuntimeTmuxSessionName(session)) return undefined;
   const provider = resolveEffectiveRuntimeProvider(session, binding);
-  if (provider.provider !== 'tmux' || resolveCursorTransport(session) === 'desktop') return undefined;
+  if (provider.runtime === 'antigravity' || provider.provider !== 'tmux' || resolveCursorTransport(session) === 'desktop') return undefined;
   const sessionName = provider.runtime === 'kimi' ? kimiTmuxSessionName(session.id)
     : provider.runtime === 'zcode' ? zcodeTmuxSessionName(session.id) : undefined;
   return sessionName ? { sessionName, runtime: provider.runtime } : undefined;
@@ -103,6 +104,20 @@ export async function stopRunningSession(options: {
   }
   options.deps.cancelQueuedSessionMessages?.(options.binding.bridgeSessionId);
   const session = options.store.getSession(options.binding.bridgeSessionId);
+  if (session && resolveEffectiveRuntimeProvider(session, options.binding).identity === 'antigravity:acp') {
+    const task = options.deps.getActiveTask(session.id);
+    task?.abortController.abort();
+    const interrupted = await interruptAntigravityAcpSession(session.id);
+    return {
+      stopped: interrupted || Boolean(task),
+      method: interrupted || task ? 'acp_interrupt' : 'idle',
+      detail: interrupted
+        ? 'Antigravity ACP 已确认中断当前轮次。'
+        : task
+          ? '已取消本次输入，等待连接收尾。'
+          : 'Antigravity ACP 当前没有正在运行的轮次。',
+    };
+  }
   if (session && resolveEffectiveRuntimeProvider(session, options.binding).identity === 'cursor:acp') {
     const task = options.deps.getActiveTask(session.id);
     task?.abortController.abort();

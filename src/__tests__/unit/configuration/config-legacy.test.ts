@@ -48,6 +48,13 @@ function baseConfigV2(): ConfigV2 {
         provider: 'tmux',
         mode: 'build',
       },
+      antigravity: {
+        model: '',
+        provider: 'acp',
+        mode: 'default',
+        reasoningEffort: '',
+        sandbox: false,
+      },
     },
     bridge: {
       defaultWorkspace: '~',

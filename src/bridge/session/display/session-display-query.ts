@@ -23,10 +23,13 @@ import {
   getSessionKimiSessionId,
   getSessionZcodeCwd,
   getSessionZcodeSessionId,
+  getSessionAntigravityCwd,
+  getSessionAntigravitySessionId,
   getSessionWorkingDirectory,
 } from '../../../domain/session-runtime.js';
 import {
   hasSessionCodexProviderOverride,
+  resolveAntigravityRuntimeConfig,
   resolveClaudeRuntimeConfig,
   resolveCursorRuntimeConfig,
   resolveEffectiveCodexProvider,
@@ -36,8 +39,8 @@ import {
 } from '../support.js';
 
 export interface SessionDisplaySummary {
-  kind: 'bridge' | 'codex' | 'claude' | 'kimi' | 'cursor' | 'zcode';
-  runtime: 'codex' | 'claude' | 'kimi' | 'cursor' | 'zcode';
+  kind: 'bridge' | 'codex' | 'claude' | 'kimi' | 'cursor' | 'zcode' | 'antigravity';
+  runtime: 'codex' | 'claude' | 'kimi' | 'cursor' | 'zcode' | 'antigravity';
   bridgeSessionId?: string;
   sessionId?: string;
   claudeSessionId?: string;
@@ -48,6 +51,8 @@ export interface SessionDisplaySummary {
   cursorCwd?: string;
   zcodeSessionId?: string;
   zcodeCwd?: string;
+  antigravitySessionId?: string;
+  antigravityCwd?: string;
   codexThreadId: string;
   threadId: string;
   displayTitle: string;
@@ -79,10 +84,12 @@ export interface SessionDisplayCounts {
   kimiPhysical?: number;
   cursorPhysical?: number;
   zcodePhysical?: number;
+  antigravityPhysical?: number;
   bridgeClaudeLinked?: number;
   bridgeKimiLinked?: number;
   bridgeCursorLinked?: number;
   bridgeZcodeLinked?: number;
+  bridgeAntigravityLinked?: number;
 }
 
 export interface SessionDisplayListPayload {
@@ -138,6 +145,7 @@ export function bridgeSessionExecutionProvider(session: BridgeSession | null | u
   if (activeRuntime === 'kimi') return resolveKimiRuntimeConfig(session).provider;
   if (activeRuntime === 'cursor') return resolveCursorRuntimeConfig(session).provider;
   if (activeRuntime === 'zcode') return resolveZcodeRuntimeConfig(session).provider;
+  if (activeRuntime === 'antigravity') return resolveAntigravityRuntimeConfig(session).provider;
   if (activeRuntime === 'claude') return resolveClaudeRuntimeConfig(session).provider;
   return hasSessionCodexProviderOverride(session) ? resolveEffectiveCodexProvider(session) : 'default';
 }
@@ -209,6 +217,20 @@ export function findVisibleBridgeSessionByZcodeSession(
   ));
 }
 
+export function findVisibleBridgeSessionByAntigravitySession(
+  store: Pick<BridgeStore, 'listSessions'>,
+  antigravitySessionId: string,
+  cwd?: string,
+): BridgeSession | undefined {
+  if (!antigravitySessionId) return undefined;
+  return store.listSessions().find((session) => (
+    isVisibleBridgeSession(session)
+    && getSessionActiveRuntime(session) === 'antigravity'
+    && getSessionAntigravitySessionId(session) === antigravitySessionId
+    && (!cwd || getSessionAntigravityCwd(session) === cwd || getSessionWorkingDirectory(session) === cwd)
+  ));
+}
+
 export function buildBridgeSessionDisplaySummary(
   session: BridgeSession,
   linkedCodexSession?: CodexSessionSummary,
@@ -223,9 +245,10 @@ export function buildBridgeSessionDisplaySummary(
   const kimiSessionId = getSessionKimiSessionId(session) || undefined;
   const cursorSessionId = getSessionCursorSessionId(session) || undefined;
   const zcodeSessionId = getSessionZcodeSessionId(session) || undefined;
+  const antigravitySessionId = getSessionAntigravitySessionId(session) || undefined;
   return {
     kind: 'bridge',
-    runtime: activeRuntime === 'claude' ? 'claude' : activeRuntime === 'kimi' ? 'kimi' : activeRuntime === 'cursor' ? 'cursor' : activeRuntime === 'zcode' ? 'zcode' : 'codex',
+    runtime: activeRuntime === 'claude' ? 'claude' : activeRuntime === 'kimi' ? 'kimi' : activeRuntime === 'cursor' ? 'cursor' : activeRuntime === 'zcode' ? 'zcode' : activeRuntime === 'antigravity' ? 'antigravity' : 'codex',
     bridgeSessionId: session.id,
     sessionId: session.id,
     claudeSessionId,
@@ -236,8 +259,10 @@ export function buildBridgeSessionDisplaySummary(
     cursorCwd: getSessionCursorCwd(session) || undefined,
     zcodeSessionId,
     zcodeCwd: getSessionZcodeCwd(session) || undefined,
+    antigravitySessionId,
+    antigravityCwd: getSessionAntigravityCwd(session) || undefined,
     codexThreadId,
-    threadId: codexThreadId || claudeSessionId || kimiSessionId || cursorSessionId || zcodeSessionId || '',
+    threadId: codexThreadId || claudeSessionId || kimiSessionId || cursorSessionId || zcodeSessionId || antigravitySessionId || '',
     displayTitle: title,
     title,
     codexTitle: sessionCodexTitle || linkedCodexSession?.title || '',
@@ -315,7 +340,7 @@ export function buildLocalRuntimeSessionDisplaySummary(
     }, linkedBridgeSession);
   }
 
-  const runtime = session.runtime === 'kimi' ? 'kimi' : session.runtime === 'cursor' ? 'cursor' : session.runtime === 'zcode' ? 'zcode' : 'claude';
+  const runtime = session.runtime === 'kimi' ? 'kimi' : session.runtime === 'cursor' ? 'cursor' : session.runtime === 'zcode' ? 'zcode' : session.runtime === 'antigravity' ? 'antigravity' : 'claude';
   const title = linkedBridgeSession
     ? getBridgeSessionDisplayTitleWithCodexFallback(linkedBridgeSession, session.title)
     : session.title;
@@ -333,6 +358,8 @@ export function buildLocalRuntimeSessionDisplaySummary(
     cursorCwd: runtime === 'cursor' ? session.cwd : undefined,
     zcodeSessionId: runtime === 'zcode' ? session.threadId : undefined,
     zcodeCwd: runtime === 'zcode' ? session.cwd : undefined,
+    antigravitySessionId: runtime === 'antigravity' ? session.threadId : undefined,
+    antigravityCwd: runtime === 'antigravity' ? session.cwd : undefined,
     codexThreadId: '',
     threadId: session.threadId,
     displayTitle: title,
@@ -340,10 +367,14 @@ export function buildLocalRuntimeSessionDisplaySummary(
     codexTitle: '',
     cwd: session.cwd,
     mode: '-',
-    executionProvider: runtime === 'cursor' && session.source === 'cursor-desktop'
+    executionProvider: runtime === 'antigravity'
+      ? 'acp'
+      : runtime === 'cursor' && session.source === 'cursor-desktop'
       ? 'desktop'
       : runtime === 'kimi' || runtime === 'cursor' || runtime === 'zcode' ? 'tmux' : 'pty',
-    codexProvider: runtime === 'cursor' && session.source === 'cursor-desktop'
+    codexProvider: runtime === 'antigravity'
+      ? 'acp'
+      : runtime === 'cursor' && session.source === 'cursor-desktop'
       ? 'desktop'
       : runtime === 'kimi' || runtime === 'cursor' || runtime === 'zcode' ? 'tmux' : '-',
     creatorKind: 'tui_cli',
@@ -354,7 +385,7 @@ export function buildLocalRuntimeSessionDisplaySummary(
       source: session.source || undefined,
       cliVersion: session.cliVersion || undefined,
     },
-    originator: session.originator || (runtime === 'kimi' ? 'Kimi Code' : runtime === 'cursor' ? 'Cursor Agent' : runtime === 'zcode' ? 'ZCode' : 'Claude Code'),
+    originator: session.originator || (runtime === 'kimi' ? 'Kimi Code' : runtime === 'cursor' ? 'Cursor Agent' : runtime === 'zcode' ? 'ZCode' : runtime === 'antigravity' ? 'Antigravity' : 'Claude Code'),
     source: session.source || runtime,
     lastEventAt: session.lastEventAt,
   };
@@ -406,6 +437,8 @@ export class SessionDisplayQuery {
             ? findVisibleBridgeSessionByCursorSession(this.store, session.threadId, session.cwd)
             : session.runtime === 'zcode'
               ? findVisibleBridgeSessionByZcodeSession(this.store, session.threadId, session.cwd)
+              : session.runtime === 'antigravity'
+                ? findVisibleBridgeSessionByAntigravitySession(this.store, session.threadId, session.cwd)
             : findVisibleBridgeSessionByClaudeSession(this.store, session.threadId, session.cwd),
     );
   }
@@ -505,6 +538,7 @@ export class SessionDisplayQuery {
     const bridgeByKimiIdentity = new Map<string, BridgeSession>();
     const bridgeByCursorIdentity = new Map<string, BridgeSession>();
     const bridgeByZcodeIdentity = new Map<string, BridgeSession>();
+    const bridgeByAntigravityIdentity = new Map<string, BridgeSession>();
     for (const session of bridgeRawSessions) {
       const codexThreadId = getBridgeSessionCodexThreadId(session);
       if (codexThreadId && !bridgeByCodexThreadId.has(codexThreadId)) {
@@ -534,6 +568,11 @@ export class SessionDisplayQuery {
         const key = `${zcodeCwd}\0${zcodeSessionId}`;
         if (!bridgeByZcodeIdentity.has(key)) bridgeByZcodeIdentity.set(key, session);
       }
+      const antigravitySessionId = getSessionAntigravitySessionId(session);
+      if (antigravitySessionId) {
+        const key = antigravitySessionId;
+        if (!bridgeByAntigravityIdentity.has(key)) bridgeByAntigravityIdentity.set(key, session);
+      }
     }
 
     let dedupedBridgeRows = 0;
@@ -542,6 +581,7 @@ export class SessionDisplayQuery {
     const seenKimiIdentities = new Set<string>();
     const seenCursorIdentities = new Set<string>();
     const seenZcodeIdentities = new Set<string>();
+    const seenAntigravityIdentities = new Set<string>();
     const bridgeSessions: SessionDisplaySummary[] = [];
     for (const session of bridgeRawSessions) {
       const codexThreadId = getBridgeSessionCodexThreadId(session);
@@ -592,6 +632,14 @@ export class SessionDisplayQuery {
         }
         seenZcodeIdentities.add(key);
       }
+      const antigravitySessionId = getSessionAntigravitySessionId(session);
+      if (antigravitySessionId) {
+        if (seenAntigravityIdentities.has(antigravitySessionId)) {
+          dedupedBridgeRows += 1;
+          continue;
+        }
+        seenAntigravityIdentities.add(antigravitySessionId);
+      }
       const linkedCodex = codexThreadId ? codexByThreadId.get(codexThreadId) : undefined;
       bridgeSessions.push(buildBridgeSessionDisplaySummary(session, linkedCodex as CodexSessionSummary | undefined));
     }
@@ -600,6 +648,11 @@ export class SessionDisplayQuery {
       .filter((session) => {
         if (session.runtime === 'codex') {
           const linked = bridgeByCodexThreadId.has(session.threadId);
+          if (linked) dedupedBridgeRows += 1;
+          return !linked;
+        }
+        if (session.runtime === 'antigravity') {
+          const linked = bridgeByAntigravityIdentity.has(session.threadId);
           if (linked) dedupedBridgeRows += 1;
           return !linked;
         }
@@ -631,11 +684,13 @@ export class SessionDisplayQuery {
     const kimiPhysical = localRuntimeSessions.filter((session) => session.runtime === 'kimi').length;
     const cursorPhysical = localRuntimeSessions.filter((session) => session.runtime === 'cursor').length;
     const zcodePhysical = localRuntimeSessions.filter((session) => session.runtime === 'zcode').length;
+    const antigravityPhysical = localRuntimeSessions.filter((session) => session.runtime === 'antigravity').length;
     const bridgeCodexLinked = bridgeRawSessions.filter((session) => Boolean(getBridgeSessionCodexThreadId(session))).length;
     const bridgeClaudeLinked = bridgeRawSessions.filter((session) => Boolean(getSessionClaudeSessionId(session))).length;
     const bridgeKimiLinked = bridgeRawSessions.filter((session) => Boolean(getSessionKimiSessionId(session))).length;
     const bridgeCursorLinked = bridgeRawSessions.filter((session) => Boolean(getSessionCursorSessionId(session))).length;
     const bridgeZcodeLinked = bridgeRawSessions.filter((session) => Boolean(getSessionZcodeSessionId(session))).length;
+    const bridgeAntigravityLinked = bridgeRawSessions.filter((session) => Boolean(getSessionAntigravitySessionId(session))).length;
 
     return {
       root: options.root,
@@ -646,6 +701,7 @@ export class SessionDisplayQuery {
         kimiPhysical,
         cursorPhysical,
         zcodePhysical,
+        antigravityPhysical,
         bridgeStored: bridgeRawSessions.length,
         bridgeWithoutCodexThread,
         bridgeCodexLinked,
@@ -653,6 +709,7 @@ export class SessionDisplayQuery {
         bridgeKimiLinked,
         bridgeCursorLinked,
         bridgeZcodeLinked,
+        bridgeAntigravityLinked,
         dedupedBridgeRows,
         totalDisplayable: combined.length,
         displayed: sessions.length,

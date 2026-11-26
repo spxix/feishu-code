@@ -47,9 +47,10 @@ import {
   parseContextUsageInfo,
   type ContextUsageInfo,
 } from '../../../shared/progress/context-usage.js';
-import { resolveClaudeRuntimeConfig, resolveCodexInvocationModel, resolveCursorInvocationModel, resolveCursorRuntimeConfig, resolveKimiRuntimeConfig, resolveSessionRuntimeConfig, resolveZcodeRuntimeConfig } from '../../session/support.js';
+import { resolveAntigravityRuntimeConfig, resolveClaudeRuntimeConfig, resolveCodexInvocationModel, resolveCursorInvocationModel, resolveCursorRuntimeConfig, resolveKimiRuntimeConfig, resolveSessionRuntimeConfig, resolveZcodeRuntimeConfig } from '../../session/support.js';
 import {
   getSessionActiveRuntime,
+  getSessionAntigravitySessionId,
   getSessionClaudeSessionId,
   getSessionCodexThreadId,
   getSessionKimiSessionId,
@@ -58,6 +59,7 @@ import {
   getSessionZcodeSessionId,
   getSessionSystemPrompt,
   getSessionWorkingDirectory,
+  setSessionAntigravityIdentityUpdate,
   setSessionClaudeSessionIdUpdate,
   setSessionClaudeIdentityUpdate,
   setSessionKimiIdentityUpdate,
@@ -226,6 +228,7 @@ export async function processMessage(
     const kimiRuntimeConfig = activeRuntime === 'kimi' ? resolveKimiRuntimeConfig(session, binding) : null;
     const cursorRuntimeConfig = activeRuntime === 'cursor' ? resolveCursorRuntimeConfig(session, binding) : null;
     const zcodeRuntimeConfig = activeRuntime === 'zcode' ? resolveZcodeRuntimeConfig(session, binding) : null;
+    const antigravityRuntimeConfig = activeRuntime === 'antigravity' ? resolveAntigravityRuntimeConfig(session, binding) : null;
 
     if (cursorRuntimeConfig && getSessionCursorSessionId(session)
       && !getSessionCursorSessionIdForProvider(session, cursorRuntimeConfig.provider)) {
@@ -252,9 +255,12 @@ export async function processMessage(
     const kimiSessionId = getSessionKimiSessionId(session);
     const cursorSessionId = cursorRuntimeConfig ? getSessionCursorSessionIdForProvider(session, cursorRuntimeConfig.provider) : undefined;
     const zcodeSessionId = getSessionZcodeSessionId(session);
+    const antigravitySessionId = getSessionAntigravitySessionId(session);
 
     // Effective model
-    const effectiveModel = activeRuntime === 'zcode'
+    const effectiveModel = activeRuntime === 'antigravity'
+      ? antigravityRuntimeConfig?.model
+      : activeRuntime === 'zcode'
       ? zcodeRuntimeConfig?.model
       : activeRuntime === 'cursor'
       ? resolveCursorInvocationModel(binding, session, { resuming: Boolean(cursorSessionId) })
@@ -297,6 +303,10 @@ export async function processMessage(
       cursorReasoningEffort: cursorRuntimeConfig?.reasoningEffort,
       zcodeSessionId,
       zcodeMode: zcodeRuntimeConfig?.mode,
+      antigravitySessionId,
+      antigravityMode: antigravityRuntimeConfig?.mode,
+      antigravityReasoningEffort: antigravityRuntimeConfig?.reasoningEffort,
+      antigravitySandbox: antigravityRuntimeConfig?.sandbox,
       claudeExecutable: claudeRuntimeConfig?.executable,
       claudeProvider: claudeRuntimeConfig?.provider,
       model: effectiveModel,
@@ -343,7 +353,7 @@ export async function processMessage(
         // ACP cancellation is a request, not the terminal event. Its owner must
         // drain the remaining text/tool results until session/prompt settles.
         // A genuinely superseded task still cannot write to the next turn.
-        isCurrentTask: cursorRuntimeConfig?.provider === 'acp'
+        isCurrentTask: cursorRuntimeConfig?.provider === 'acp' || activeRuntime === 'antigravity'
           ? () => options?.isCurrentTask?.() !== false
           : isCurrentTask,
       },
@@ -594,7 +604,17 @@ async function consumeStream(
           try {
             const statusData = JSON.parse(event.data);
             if (statusData.session_id) {
-              if (activeRuntime === 'zcode') {
+              if (activeRuntime === 'antigravity') {
+                store.updateSession(sessionId, setSessionAntigravityIdentityUpdate(
+                  statusData.session_id,
+                  typeof statusData.cwd === 'string' ? statusData.cwd : undefined,
+                ));
+                await options?.onRuntimeIdentity?.({
+                  runtime: 'antigravity',
+                  sessionId: statusData.session_id,
+                  ...(typeof statusData.cwd === 'string' ? { cwd: statusData.cwd } : {}),
+                });
+              } else if (activeRuntime === 'zcode') {
                 store.updateSession(sessionId, setSessionZcodeIdentityUpdate(
                   statusData.session_id,
                   typeof statusData.cwd === 'string' ? statusData.cwd : undefined,
@@ -762,7 +782,17 @@ async function consumeStream(
             }
             if (resultData.is_error) hasError = true;
             if (resultData.session_id) {
-              if (activeRuntime === 'zcode') {
+              if (activeRuntime === 'antigravity') {
+                store.updateSession(sessionId, setSessionAntigravityIdentityUpdate(
+                  resultData.session_id,
+                  typeof resultData.cwd === 'string' ? resultData.cwd : undefined,
+                ));
+                await options?.onRuntimeIdentity?.({
+                  runtime: 'antigravity',
+                  sessionId: resultData.session_id,
+                  ...(typeof resultData.cwd === 'string' ? { cwd: resultData.cwd } : {}),
+                });
+              } else if (activeRuntime === 'zcode') {
                 store.updateSession(sessionId, setSessionZcodeIdentityUpdate(
                   resultData.session_id,
                   typeof resultData.cwd === 'string' ? resultData.cwd : undefined,

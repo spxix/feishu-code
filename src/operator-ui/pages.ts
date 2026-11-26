@@ -75,6 +75,12 @@ export function overviewPageHtml(version: string): string {
                 <span class="runtime-status-config" id="runtime-zcode-config">默认配置检查中</span>
                 <span class="runtime-status-recent" id="runtime-zcode-recent">最近活动检查中</span>
               </button>
+              <button type="button" class="runtime-status-item" data-runtime="antigravity" aria-label="查看 Antigravity 会话">
+                <span class="runtime-status-head"><strong>Antigravity</strong><span class="runtime-state" id="runtime-antigravity-state">检查中</span></span>
+                <span class="runtime-status-counts" id="runtime-antigravity-counts">正在读取会话与入口</span>
+                <span class="runtime-status-config" id="runtime-antigravity-config">默认配置检查中</span>
+                <span class="runtime-status-recent" id="runtime-antigravity-recent">最近活动检查中</span>
+              </button>
             </div>
           </section>
 
@@ -191,6 +197,7 @@ export const sessionsPageHtml = `        <section class="page" data-page="sessio
                 <option value="kimi">Kimi Code</option>
                 <option value="cursor">Cursor Agent</option>
                 <option value="zcode">ZCode</option>
+                <option value="antigravity">Antigravity</option>
               </select></label>
               <button type="button" id="clearSessionFiltersBtn">清除筛选</button>
             </div>
@@ -269,6 +276,7 @@ export const configPageHtml = `        <section class="page" data-page="config">
               <button type="button" class="config-tab" role="tab" aria-selected="false" data-config-tab="kimi">Kimi</button>
               <button type="button" class="config-tab" role="tab" aria-selected="false" data-config-tab="cursor">Cursor</button>
               <button type="button" class="config-tab" role="tab" aria-selected="false" data-config-tab="zcode">ZCode</button>
+              <button type="button" class="config-tab" role="tab" aria-selected="false" data-config-tab="antigravity">Antigravity</button>
               <button type="button" class="config-tab" role="tab" aria-selected="false" data-config-tab="web">Web 与 Bridge</button>
             </div>
 
@@ -386,6 +394,7 @@ export const configPageHtml = `        <section class="page" data-page="config">
                       <option value="kimi">kimi</option>
                       <option value="cursor">cursor</option>
                       <option value="zcode">zcode</option>
+                      <option value="antigravity">antigravity</option>
                     </select>
                   </label>
                 </div>
@@ -445,6 +454,29 @@ export const configPageHtml = `        <section class="page" data-page="config">
                     <span class="field-title">ZCode 默认模式</span>
                     <select id="zcodeMode"><option value="build">build</option><option value="edit">edit</option><option value="plan">plan</option><option value="yolo">yolo</option></select>
                   </label>
+                </div>
+              </div>
+
+              <div class="panel-block" data-config-section="antigravity" hidden>
+                <p class="panel-subtitle">Antigravity 默认值</p>
+                <div class="field-row triple">
+                  <label>
+                    <span class="field-title">默认 Antigravity Provider <span class="help-tip" tabindex="0" data-tip="Google Antigravity CLI 通过 agy acp（ACP）流式通信，无需 tmux。">?</span></span>
+                    <select id="antigravityProvider"><option value="acp">acp</option></select>
+                  </label>
+                  <label>
+                    <span class="field-title">Antigravity 默认模型 <span class="help-tip" tabindex="0" data-tip="例如 gemini-3.1-pro 或 claude-sonnet-4-6；留空则跟随 agy 默认模型。">?</span></span>
+                    <input id="antigravityDefaultModel" placeholder="留空则跟随 Antigravity 默认" />
+                  </label>
+                  <label>
+                    <span class="field-title">Antigravity 默认模式</span>
+                    <select id="antigravityMode"><option value="default">default</option><option value="accept-edits">accept-edits</option><option value="auto">auto</option><option value="plan">plan</option><option value="yolo">yolo</option></select>
+                  </label>
+                  <label>
+                    <span class="field-title">Antigravity 思考级别</span>
+                    <select id="antigravityReasoningEffort"><option value="">跟随 Antigravity</option><option value="low">low</option><option value="medium">medium</option><option value="high">high</option><option value="xhigh">xhigh</option></select>
+                  </label>
+                  <label class="checkbox"><input id="antigravitySandbox" type="checkbox" /> 启用 Antigravity sandbox</label>
                 </div>
               </div>
 

@@ -19,6 +19,8 @@ import {
   getSessionCursorSessionId,
   getSessionZcodeCwd,
   getSessionZcodeSessionId,
+  getSessionAntigravityCwd,
+  getSessionAntigravitySessionId,
   getSessionWorkingDirectory,
   mergeSessionRuntimeUpdates,
   setSessionActiveRuntimeUpdate,
@@ -46,6 +48,7 @@ import {
   archiveCommandKimiThread,
   archiveCommandCursorThread,
   archiveCommandZcodeThread,
+  archiveCommandAntigravityThread,
   getCommandLocalRuntimeThreadByIdSafe,
   getCommandCodexThreadByIdSafe,
   listCommandLocalRuntimeSessions,
@@ -221,6 +224,15 @@ export function createCommandSessionRegistry(store: BridgeStore): SessionRegistr
       },
       archiveThread: (zcodeSessionId, cwd) => Boolean(archiveCommandZcodeThread(zcodeSessionId, cwd)),
     },
+    antigravityThreads: {
+      getThread: (antigravitySessionId, cwd) => {
+        const thread = getCommandLocalRuntimeThreadByIdSafe(antigravitySessionId, cwd, 'antigravity registry lookup').thread;
+        return thread?.runtime === 'antigravity'
+          ? { antigravitySessionId: thread.threadId, title: thread.title, cwd: thread.cwd }
+          : null;
+      },
+      archiveThread: (antigravitySessionId, cwd) => Boolean(archiveCommandAntigravityThread(antigravitySessionId, cwd)),
+    },
     readDefaultModel: () => readConfiguredCodexModel(),
     defaultWorkingDirectory: () => DEFAULT_WORKSPACE_ROOT,
   });
@@ -314,6 +326,27 @@ export function findBridgeSessionByZcodeIdentity(
   return findBridgeSessionByZcodeThread(store, { threadId: sessionId, cwd });
 }
 
+function findBridgeSessionByAntigravityThread(
+  store: BridgeStore,
+  thread: Pick<LocalRuntimeSessionSummary, 'threadId' | 'cwd'>,
+): BridgeSession | null {
+  return store.listSessions().find((session) => (
+    session.hidden !== true
+    && session.session_type !== 'draft'
+    && session.runtime?.activeRuntime === 'antigravity'
+    && session.runtime?.antigravity?.sessionId === thread.threadId
+    && (!thread.cwd || !session.runtime?.antigravity?.cwd || session.runtime?.antigravity?.cwd === thread.cwd)
+  )) || null;
+}
+
+export function findBridgeSessionByAntigravityIdentity(
+  store: BridgeStore,
+  sessionId: string,
+  cwd: string,
+): BridgeSession | null {
+  return findBridgeSessionByAntigravityThread(store, { threadId: sessionId, cwd });
+}
+
 function materializeClaudeThread(store: BridgeStore, thread: LocalRuntimeSessionSummary): BridgeSession {
   const existing = findBridgeSessionByClaudeThread(store, thread);
   if (existing) return existing;
@@ -397,8 +430,26 @@ function materializeZcodeThread(store: BridgeStore, thread: LocalRuntimeSessionS
   return store.getSession(session.id) || session;
 }
 
+function materializeAntigravityThread(store: BridgeStore, thread: LocalRuntimeSessionSummary): BridgeSession {
+  const existing = findBridgeSessionByAntigravityThread(store, thread);
+  if (existing) return existing;
+  const session = store.createSession(
+    thread.title || thread.threadId.slice(0, 8),
+    'default',
+    undefined,
+    thread.cwd || DEFAULT_WORKSPACE_ROOT,
+    'normal',
+  );
+  store.updateSession(session.id, mergeSessionRuntimeUpdates(
+    {},
+    setSessionActiveRuntimeUpdate('antigravity'),
+    { runtime: { antigravity: { sessionId: thread.threadId, cwd: thread.cwd, provider: 'acp' } } },
+  ));
+  return store.getSession(session.id) || session;
+}
+
 export function localRuntimeOf(thread: LocalRuntimeSessionSummary | undefined): RuntimeAgent {
-  return thread?.runtime === 'claude' || thread?.runtime === 'kimi' || thread?.runtime === 'cursor' || thread?.runtime === 'zcode'
+  return thread?.runtime === 'claude' || thread?.runtime === 'kimi' || thread?.runtime === 'cursor' || thread?.runtime === 'zcode' || thread?.runtime === 'antigravity'
     ? thread.runtime
     : 'codex';
 }
@@ -409,6 +460,12 @@ export function bindToLocalRuntimeThread(
   thread: LocalRuntimeSessionSummary,
   opts?: { codexTitle?: string },
 ): ChannelChat {
+  if (localRuntimeOf(thread) === 'antigravity') {
+    const session = materializeAntigravityThread(store, thread);
+    const binding = router.attachToSession(address, session.id);
+    if (!binding) throw new Error('指定的 Antigravity 会话无法绑定。');
+    return binding;
+  }
   if (localRuntimeOf(thread) === 'zcode') {
     const session = materializeZcodeThread(store, thread);
     const binding = router.attachToSession(address, session.id);
@@ -485,6 +542,19 @@ export function resolveCurrentCodexThreadTarget(
 
   const session = store.getSession(binding.bridgeSessionId);
   const activeRuntime = getSessionActiveRuntime(session) || 'codex';
+  if (activeRuntime === 'antigravity') {
+    const sessionId = getSessionAntigravitySessionId(session);
+    const cwd = getSessionAntigravityCwd(session) || getSessionWorkingDirectory(session);
+    if (!sessionId) return { binding, bridgeSessionId: binding.bridgeSessionId };
+    return {
+      threadId: sessionId,
+      title: session ? getBridgeSessionDisplayTitle(session) : threadDisplay.binding(binding).title,
+      cwd,
+      binding,
+      bridgeSessionId: binding.bridgeSessionId,
+      runtime: 'antigravity',
+    };
+  }
   if (activeRuntime === 'zcode') {
     const sessionId = getSessionZcodeSessionId(session);
     const cwd = getSessionZcodeCwd(session) || getSessionWorkingDirectory(session);

@@ -2,7 +2,7 @@
 
 ## 安装
 
-CodeLark 不接管 `~/.codex`、`~/.claude-code`、`~/.claude-code-router`、`~/.kimi-code`、`~/.cursor` 或 `~/.zcode` 的模型供应商配置。Codex CLI、Claude Code、CCR、Kimi Code、Cursor Agent、ZCode 或 API 登录态仍按你的本机环境自行准备；CodeLark 只保存自己的配置和桥接状态。Cursor Agent 可通过 [Cursor 官方安装入口](https://cursor.com/install) 安装，并需先在本机终端完成登录。
+CodeLark 不接管 `~/.codex`、`~/.claude-code`、`~/.claude-code-router`、`~/.kimi-code`、`~/.cursor`、`~/.zcode` 或 `~/.gemini/antigravity-cli` 的模型供应商配置。Codex CLI、Claude Code、CCR、Kimi Code、Cursor Agent、ZCode、Antigravity (`agy`) 或 API 登录态仍按你的本机环境自行准备；CodeLark 只保存自己的配置和桥接状态。Cursor Agent 可通过 [Cursor 官方安装入口](https://cursor.com/install) 安装，并需先在本机终端完成登录；Antigravity 通过本机 `agy acp` 协议直连，不依赖 `tmux`。
 
 ```bash
 # export OPENAI_API_KEY=sk-xxx
@@ -23,8 +23,8 @@ Bridge 每个本地自然日最多检查一次 npm 最新版本。检查由当�
 ## 前置条件
 
 - 本机已经可以运行 `codelark`。
-- 本机已有可用的 Codex、Claude Code、Kimi Code、Cursor Agent、ZCode 登录态或对应 API 凭据。
-- 本机 PATH 中已有 `tmux` 命令；如果没有，`codelark setup` 会按平台说明将执行的命令并帮助安装，具体行为见下方平台说明和首次配置步骤。
+- 本机已有可用的 Codex、Claude Code、Kimi Code、Cursor Agent、ZCode 或 Antigravity (`agy`) 登录态或对应 API 凭据。
+- 本机 PATH 中已有 `tmux` 命令（仅使用 Antigravity `acp` 时可不依赖 `tmux`）；如果没有，`codelark setup` 会按平台说明将执行的命令并帮助安装，具体行为见下方平台说明和首次配置步骤。
 - 已创建飞书/Lark 自建应用并拿到 `App ID` / `App Secret`，或允许向导通过开放平台扫码创建机器人配置。
 - 飞书应用已启用机器人、权限、事件订阅和长连接。详细步骤见 [平台配置指南](platform-setup.md)。
 
@@ -104,6 +104,7 @@ codelark install-skills codelark condition-monitor
 - 没有前两者但有 `~/.claude-code` 或 `~/.claude`：推荐 Claude Code。
 - 没有前三者但有 `~/.kimi-code`：推荐 Kimi Code（需要 tmux）。
 - 没有上述配置但有 `~/.cursor`：推荐 Cursor Agent（需要 tmux）。
+- 没有上述配置但有 `~/.gemini/antigravity-cli`（或本机已安装 `agy`）：可选择 Antigravity（通过 `agy acp` 运行，无需 tmux）。
 - 都没有：默认 Claude Code，后续可在向导或 IM 命令里切换。
 
 向导会写入：
@@ -155,20 +156,17 @@ http://127.0.0.1:4781
 
 ## 飞书应用配置
 
-飞书侧至少需要完成：
+手动创建飞书/Lark 自建应用（不走扫码）的完整分步说明、权限 JSON、按应用隔离的 `open_id` 获取方法与私用安全建议，请直接参考 **[手动飞书配置指南](platform-setup.md)**。核心顺序如下：
 
-1. 在飞书开放平台创建自建应用，记录 `App ID` 和 `App Secret`。
+1. 在飞书开放平台创建自建应用（建议按计算节点建 1 个 bot，而非按 runtime 建多个），记录 `App ID` 和 `App Secret`。
 2. 启用 Bot 能力。
-3. 添加消息发送、消息读取、卡片读写、消息更新、云文档评论写入等权限。
-4. 发布版本并由管理员审批。
-5. 启动 CodeLark bridge。
-6. 在事件订阅里选择长连接。
-7. 添加 `im.message.receive_v1`、`drive.notice.comment_add_v1`、`im.chat.member.bot.deleted_v1`、`im.chat.disbanded_v1` 事件和 `card.action.trigger` 回调。
-8. 再次发布版本并审批。
+3. 批量导入最小核心权限（`cardkit:card:*`、`im:chat:*`、`im:message:*`、`im:resource`；部分租户 `im:chat:create_by_user` 标红时可直接去掉；如仅本人私用可跳过 `docs:document.comment:*`）。
+4. 将可见范围收紧为仅自己，发布 `1.0.0` 并审批通过。
+5. 本机运行 `codelark setup`（手动粘贴凭据，填写 `allowed_users`），执行 `chmod 700 ~/.codelark` 并先运行 `codelark start` 让 WebSocket 上线。
+6. 回到飞书后台 **事件与回调**，将事件和回调的订阅方式都切到 **长连接**，添加 `im.message.receive_v1`、`im.chat.member.bot.deleted_v1`、`im.chat.disbanded_v1` 以及回调 `card.action.trigger`（仅本人私用时跳过 `drive.notice.comment_add_v1`）。
+7. 发布 `1.1.0` 并审批通过，随后私聊机器人发送 `/current` 验证。
 
-如果 `CODELARK_FEISHU_ALLOWED_USERS` 为空，所有能给机器人发消息的人都可以使用该 bot。需要收紧访问时，填写飞书用户 open_id 列表。
-
-云文档评论能力除事件订阅外，还需要文档评论写入权限。缺少 `docs:document.comment:create` 或 `docs:document.comment:write_only` 时，bridge 可以收到评论事件，但无法写回评论或添加 `Typing` 表情。
+如果 `allowed_users` 为空，所有能给机器人发消息的人都可以使用该 bot；务必填写当前新建应用对应的飞书用户 `open_id`（`ou_...`）。
 
 ## 本地工作台
 
@@ -178,7 +176,7 @@ http://127.0.0.1:4781
 - 在侧边栏确认当前 CodeLark 版本。
 - 配置飞书通道实例。
 - 测试飞书凭据和连通性。
-- 查看本地 Codex / Claude Code / Kimi Code 会话。
+- 查看本地 Codex / Claude Code / Kimi Code / Cursor Agent / ZCode / Antigravity 会话。
 - 查看 CodeLark Bridge 会话和聊天绑定。
 - 查看会话历史。
 - 把已经发过消息的具体群聊或单聊切换到目标会话；未知新聊天始终先建立自己的独立临时会话。
@@ -242,11 +240,13 @@ CodeLark 自有数据位于：
 - `logs/`：bridge、UI 和启动器日志。
 - `runtime/`：运行状态、PID、端口等临时状态。
 
-Codex 自己的会话数据仍由 Codex 管理，CodeLark 只读取必要的 session index 和 JSONL；Claude Code、Kimi Code 同理：
+Codex 自己的会话数据仍由 Codex 管理，CodeLark 只读取必要的 session index 和 JSONL；Claude Code、Kimi Code、Antigravity 同理：
 
 ```text
 ~/.codex/sessions/**/*.jsonl
 ~/.kimi-code/sessions/wd_*/session_*/agents/main/wire.jsonl
+~/.gemini/antigravity-cli/conversation_summaries.db
+~/.gemini/antigravity-cli/brain/<session-id>/.system_generated/logs/transcript.jsonl
 ```
 
 遇到启动、消息收发、权限或卡片问题时，见 [排障指南](troubleshooting.md)。

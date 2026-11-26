@@ -1,4 +1,4 @@
-export type OperatorRuntime = 'codex' | 'claude' | 'kimi' | 'cursor' | 'zcode';
+export type OperatorRuntime = 'codex' | 'claude' | 'kimi' | 'cursor' | 'zcode' | 'antigravity';
 
 export interface RuntimeStatusProjection {
   tone: 'running' | 'queued' | 'attention' | 'idle' | 'available' | 'missing';
@@ -71,6 +71,11 @@ export const projectRuntimeStatusBrowserSource = String.raw`function projectRunt
     config = {
       provider: String(globalConfig.zcodeProvider || 'tmux'),
       model: String(globalConfig.zcodeDefaultModel || '跟随 ZCode'),
+    };
+  } else if (runtime === 'antigravity') {
+    config = {
+      provider: String(globalConfig.antigravityProvider || 'acp'),
+      model: String(globalConfig.antigravityDefaultModel || '跟随 Antigravity'),
     };
   } else {
     const inheritedProvider = globalConfig.defaultProviderInherited === true;

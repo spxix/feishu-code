@@ -45,6 +45,7 @@ import {
 import { getBridgeSessionDisplayTitle } from '../../session/display/session-display-query.js';
 import {
   getSessionActiveRuntime,
+  getSessionAntigravitySessionId,
   getSessionKimiSessionId,
   getSessionCodexThreadId,
   getSessionClaudeSessionId,
@@ -54,6 +55,7 @@ import {
   getSessionWorkingDirectory,
 } from '../../../domain/session-runtime.js';
 import {
+  resolveAntigravityRuntimeConfig,
   resolveEffectiveClaudeProvider,
   resolveEffectiveCodexProvider,
   getSessionCodexProviderOverride,
@@ -264,7 +266,9 @@ export async function runInteractiveMessage(
     if (targetBinding.id === binding.id && initialSession) {
       const displayRuntime = getSessionActiveRuntime(initialSession) || 'codex';
       const metadata = resolveRuntimeMetadataConfig(initialSession, displayRuntime, binding);
-      const threadId = displayRuntime === 'zcode'
+      const threadId = displayRuntime === 'antigravity'
+        ? getSessionAntigravitySessionId(initialSession) || ''
+        : displayRuntime === 'zcode'
         ? getSessionZcodeSessionId(initialSession) || ''
         : displayRuntime === 'cursor'
         ? getSessionCursorSessionId(initialSession) || ''
@@ -273,7 +277,9 @@ export async function runInteractiveMessage(
         : displayRuntime === 'claude'
           ? getSessionClaudeSessionId(initialSession) || ''
           : getSessionCodexThreadId(initialSession) || '';
-      const executionProvider = displayRuntime === 'zcode'
+      const executionProvider = displayRuntime === 'antigravity'
+        ? resolveAntigravityRuntimeConfig(initialSession, binding).provider
+        : displayRuntime === 'zcode'
         ? resolveZcodeRuntimeConfig(initialSession, binding).provider
         : displayRuntime === 'cursor'
         ? resolveCursorRuntimeConfig(initialSession, binding).provider
@@ -393,6 +399,8 @@ export async function runInteractiveMessage(
         ? getSessionKimiSessionId(initialSession)
         : activeRuntime === 'zcode'
           ? getSessionZcodeSessionId(initialSession)
+          : activeRuntime === 'antigravity'
+            ? getSessionAntigravitySessionId(initialSession)
         : turnClassification.codexThreadId,
     requestMessageId,
     streamKey,

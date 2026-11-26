@@ -1,6 +1,8 @@
 import type { FileAttachment } from '../domain/message.js';
 import type { ContextUsageInfo, TaskProgressInfo, ToolCallDetail } from '../domain/progress.js';
 import type {
+  AntigravityMode,
+  AntigravityReasoningEffort,
   BridgeSessionClaudeRuntimeState,
   ClaudeExecutable,
   ClaudeProviderChoice,
@@ -66,7 +68,7 @@ export interface BridgeApiProvider {
 export interface StreamChatParams {
   prompt: string;
   sessionId: string;
-  runtime?: 'codex' | 'claude' | 'kimi' | 'cursor' | 'zcode';
+  runtime?: 'codex' | 'claude' | 'kimi' | 'cursor' | 'zcode' | 'antigravity';
   codexThreadId?: string;
   codexAppServerEndpoint?: string;
   claudeSessionId?: string;
@@ -82,6 +84,10 @@ export interface StreamChatParams {
   cursorReasoningEffort?: string;
   zcodeSessionId?: string;
   zcodeMode?: 'build' | 'edit' | 'plan' | 'yolo';
+  antigravitySessionId?: string;
+  antigravityMode?: AntigravityMode;
+  antigravityReasoningEffort?: AntigravityReasoningEffort;
+  antigravitySandbox?: boolean;
   claudeExecutable?: ClaudeExecutable;
   claudeProvider?: ClaudeProviderChoice;
   model?: string;
@@ -165,7 +171,7 @@ export interface MirrorJsonlSourceSummary {
 }
 
 export interface MirrorJsonlSource {
-  readonly runtime: 'codex' | 'claude' | 'kimi' | 'cursor' | 'zcode';
+  readonly runtime: 'codex' | 'claude' | 'kimi' | 'cursor' | 'zcode' | 'antigravity';
   /** Append-only logs can be read by byte offset; mutable stores must be reconciled as snapshots. */
   readonly readMode?: 'append' | 'snapshot';
   /** A runtime may mix CLI logs and Desktop mutable stores. */

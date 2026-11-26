@@ -56,7 +56,7 @@ const RETIRED_SESSION_FIELDS = [
   'threadId',
 ];
 
-const RUNTIME_KEYS = ['codex', 'claude', 'kimi', 'cursor', 'zcode'] as const;
+const RUNTIME_KEYS = ['codex', 'claude', 'kimi', 'cursor', 'zcode', 'antigravity'] as const;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -154,10 +154,14 @@ function normalizeRuntimeBridgeSessionIds(value: unknown): Record<string, string
   const claude = typeof value.claude === 'string' && value.claude.trim() ? value.claude.trim() : '';
   const kimi = typeof value.kimi === 'string' && value.kimi.trim() ? value.kimi.trim() : '';
   const cursor = typeof value.cursor === 'string' && value.cursor.trim() ? value.cursor.trim() : '';
+  const zcode = typeof value.zcode === 'string' && value.zcode.trim() ? value.zcode.trim() : '';
+  const antigravity = typeof value.antigravity === 'string' && value.antigravity.trim() ? value.antigravity.trim() : '';
   if (codex) result.codex = codex;
   if (claude) result.claude = claude;
   if (kimi) result.kimi = kimi;
   if (cursor) result.cursor = cursor;
+  if (zcode) result.zcode = zcode;
+  if (antigravity) result.antigravity = antigravity;
   return result;
 }
 
@@ -195,7 +199,11 @@ function migrateSessions(
         ? 'kimi'
         : runtime.activeRuntime === 'cursor'
           ? 'cursor'
-          : 'codex';
+          : runtime.activeRuntime === 'zcode'
+            ? 'zcode'
+            : runtime.activeRuntime === 'antigravity'
+              ? 'antigravity'
+              : 'codex';
     const activeRuntimeState = ensureNestedContainer(runtime, activeRuntime);
     const codex = activeRuntime === 'codex' ? activeRuntimeState : {};
     const claude = activeRuntime === 'claude' ? activeRuntimeState : {};
@@ -275,7 +283,11 @@ function migrateChannelChats(
         ? 'kimi'
         : isRecord(session?.runtime) && session?.runtime.activeRuntime === 'cursor'
           ? 'cursor'
-        : 'codex';
+          : isRecord(session?.runtime) && session?.runtime.activeRuntime === 'zcode'
+            ? 'zcode'
+            : isRecord(session?.runtime) && session?.runtime.activeRuntime === 'antigravity'
+              ? 'antigravity'
+              : 'codex';
     const runtimeBridgeSessionIds = normalizeRuntimeBridgeSessionIds(value.runtimeBridgeSessionIds);
     if (!runtimeBridgeSessionIds[runtime]) {
       runtimeBridgeSessionIds[runtime] = bridgeSessionId;

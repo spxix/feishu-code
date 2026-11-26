@@ -156,7 +156,7 @@ export function uiClientScript(runtimeStatusSource: string): string {
       }
 
       function sessionCodexThreadId(session) {
-        if (!session || session.runtime === 'claude' || session.kind === 'claude' || session.runtime === 'kimi' || session.kind === 'kimi' || session.runtime === 'cursor' || session.kind === 'cursor' || session.runtime === 'zcode' || session.kind === 'zcode') return '';
+        if (!session || session.runtime === 'claude' || session.kind === 'claude' || session.runtime === 'kimi' || session.kind === 'kimi' || session.runtime === 'cursor' || session.kind === 'cursor' || session.runtime === 'zcode' || session.kind === 'zcode' || session.runtime === 'antigravity' || session.kind === 'antigravity') return '';
         return (session.codexThreadId || session.threadId) || '';
       }
 
@@ -200,8 +200,18 @@ export function uiClientScript(runtimeStatusSource: string): string {
         return session.zcodeCwd || session.cwd || '';
       }
 
+      function sessionAntigravitySessionId(session) {
+        if (!session || (session.runtime !== 'antigravity' && session.kind !== 'antigravity')) return '';
+        return session.antigravitySessionId || session.threadId || '';
+      }
+
+      function sessionAntigravityCwd(session) {
+        if (!session || (session.runtime !== 'antigravity' && session.kind !== 'antigravity')) return '';
+        return session.antigravityCwd || session.cwd || '';
+      }
+
       function sessionRuntimeThreadId(session) {
-        return sessionClaudeSessionId(session) || sessionKimiSessionId(session) || sessionCursorSessionId(session) || sessionZcodeSessionId(session) || sessionCodexThreadId(session);
+        return sessionClaudeSessionId(session) || sessionKimiSessionId(session) || sessionCursorSessionId(session) || sessionZcodeSessionId(session) || sessionAntigravitySessionId(session) || sessionCodexThreadId(session);
       }
 
       function sessionMatchesFilter(session) {
@@ -225,6 +235,7 @@ export function uiClientScript(runtimeStatusSource: string): string {
           session.kimiSessionId,
           session.cursorSessionId,
           session.zcodeSessionId,
+          session.antigravitySessionId,
           session.executionProvider,
           session.codexProvider,
           session.creatorLabel,
@@ -244,6 +255,8 @@ export function uiClientScript(runtimeStatusSource: string): string {
         if (cursorSessionId) return 'cursor:' + encodeURIComponent(cursorSessionId) + ':' + encodeURIComponent(sessionCursorCwd(session));
         const zcodeSessionId = sessionZcodeSessionId(session);
         if (zcodeSessionId) return 'zcode:' + encodeURIComponent(zcodeSessionId) + ':' + encodeURIComponent(sessionZcodeCwd(session));
+        const antigravitySessionId = sessionAntigravitySessionId(session);
+        if (antigravitySessionId) return 'antigravity:' + encodeURIComponent(antigravitySessionId) + ':' + encodeURIComponent(sessionAntigravityCwd(session));
         const codexThreadId = sessionCodexThreadId(session);
         return codexThreadId ? 'codex:' + codexThreadId : '';
       }
@@ -259,6 +272,8 @@ export function uiClientScript(runtimeStatusSource: string): string {
         const cursorCwd = sessionCursorCwd(session);
         const zcodeSessionId = sessionZcodeSessionId(session);
         const zcodeCwd = sessionZcodeCwd(session);
+        const antigravitySessionId = sessionAntigravitySessionId(session);
+        const antigravityCwd = sessionAntigravityCwd(session);
         return 'data-session-ref="' + escapeHtml(sessionRef(session)) + '"'
           + (bridgeSessionId ? ' data-bridge-session-id="' + escapeHtml(bridgeSessionId) + '"' : '')
           + (codexThreadId ? ' data-codex-thread-id="' + escapeHtml(codexThreadId) + '"' : '')
@@ -269,7 +284,9 @@ export function uiClientScript(runtimeStatusSource: string): string {
           + (cursorSessionId ? ' data-cursor-session-id="' + escapeHtml(cursorSessionId) + '"' : '')
           + (cursorCwd ? ' data-cursor-cwd="' + escapeHtml(cursorCwd) + '"' : '')
           + (zcodeSessionId ? ' data-zcode-session-id="' + escapeHtml(zcodeSessionId) + '"' : '')
-          + (zcodeCwd ? ' data-zcode-cwd="' + escapeHtml(zcodeCwd) + '"' : '');
+          + (zcodeCwd ? ' data-zcode-cwd="' + escapeHtml(zcodeCwd) + '"' : '')
+          + (antigravitySessionId ? ' data-antigravity-session-id="' + escapeHtml(antigravitySessionId) + '"' : '')
+          + (antigravityCwd ? ' data-antigravity-cwd="' + escapeHtml(antigravityCwd) + '"' : '');
       }
 
       function sessionIdentityPayload(ref) {
@@ -312,6 +329,15 @@ export function uiClientScript(runtimeStatusSource: string): string {
             zcodeCwd: decodeURIComponent(raw.slice(separator + 1)),
           };
         }
+        if (value.startsWith('antigravity:')) {
+          const raw = value.slice('antigravity:'.length);
+          const separator = raw.indexOf(':');
+          if (separator < 0) return {};
+          return {
+            antigravitySessionId: decodeURIComponent(raw.slice(0, separator)),
+            antigravityCwd: decodeURIComponent(raw.slice(separator + 1)),
+          };
+        }
         return {};
       }
 
@@ -328,6 +354,8 @@ export function uiClientScript(runtimeStatusSource: string): string {
         if (identity.cursorCwd) params.set('cursorCwd', identity.cursorCwd);
         if (identity.zcodeSessionId) params.set('zcodeSessionId', identity.zcodeSessionId);
         if (identity.zcodeCwd) params.set('zcodeCwd', identity.zcodeCwd);
+        if (identity.antigravitySessionId) params.set('antigravitySessionId', identity.antigravitySessionId);
+        if (identity.antigravityCwd) params.set('antigravityCwd', identity.antigravityCwd);
         return params.toString();
       }
 
@@ -352,6 +380,9 @@ export function uiClientScript(runtimeStatusSource: string): string {
             && binding.currentRuntime === 'zcode'
             && binding.currentRuntimeThreadId === identity.zcodeSessionId
             && (!identity.zcodeCwd || binding.currentZcodeCwd === identity.zcodeCwd))
+          || (identity.antigravitySessionId
+            && binding.currentRuntime === 'antigravity'
+            && binding.currentRuntimeThreadId === identity.antigravitySessionId)
         );
       }
 
@@ -454,11 +485,12 @@ export function uiClientScript(runtimeStatusSource: string): string {
         const isKimi = option.runtime === 'kimi' || option.kind === 'kimi';
         const isCursor = option.runtime === 'cursor' || option.kind === 'cursor';
         const isZcode = option.runtime === 'zcode' || option.kind === 'zcode';
+        const isAntigravity = option.runtime === 'antigravity' || option.kind === 'antigravity';
         return {
-          kind: isBridge ? 'bridge' : (isKimi ? 'kimi' : isClaude ? 'claude' : isCursor ? 'cursor' : isZcode ? 'zcode' : 'codex'),
-          runtime: option.runtime || (isKimi ? 'kimi' : isClaude ? 'claude' : isCursor ? 'cursor' : isZcode ? 'zcode' : 'codex'),
+          kind: isBridge ? 'bridge' : (isKimi ? 'kimi' : isClaude ? 'claude' : isCursor ? 'cursor' : isZcode ? 'zcode' : isAntigravity ? 'antigravity' : 'codex'),
+          runtime: option.runtime || (isKimi ? 'kimi' : isClaude ? 'claude' : isCursor ? 'cursor' : isZcode ? 'zcode' : isAntigravity ? 'antigravity' : 'codex'),
           bridgeSessionId: option.bridgeSessionId || option.sessionId || (isBridge ? option.id : ''),
-          codexThreadId: isClaude || isKimi || isCursor || isZcode ? '' : option.codexThreadId || option.threadId || (isBridge ? '' : option.id),
+          codexThreadId: isClaude || isKimi || isCursor || isZcode || isAntigravity ? '' : option.codexThreadId || option.threadId || (isBridge ? '' : option.id),
           claudeSessionId: option.claudeSessionId || (isClaude ? option.threadId || option.id : ''),
           claudeCwd: option.claudeCwd || (isClaude ? option.cwd || '' : ''),
           kimiSessionId: option.kimiSessionId || (isKimi ? option.threadId || option.id : ''),
@@ -467,12 +499,14 @@ export function uiClientScript(runtimeStatusSource: string): string {
           cursorCwd: option.cursorCwd || (isCursor ? option.cwd || '' : ''),
           zcodeSessionId: option.zcodeSessionId || (isZcode ? option.threadId || option.id : ''),
           zcodeCwd: option.zcodeCwd || (isZcode ? option.cwd || '' : ''),
+          antigravitySessionId: option.antigravitySessionId || (isAntigravity ? option.threadId || option.id : ''),
+          antigravityCwd: option.antigravityCwd || (isAntigravity ? option.cwd || '' : ''),
           sessionId: option.sessionId || (isBridge ? option.id : ''),
           threadId: option.threadId || (isBridge ? '' : option.id),
           title: option.label,
           cwd: option.cwd || '',
-          originator: isBridge ? 'Bridge / IM' : isKimi ? 'Kimi Code' : isClaude ? 'Claude Code' : isCursor ? 'Cursor Agent' : isZcode ? 'ZCode' : 'Codex Native',
-          source: isBridge ? 'bridge' : isKimi ? 'kimi' : isClaude ? 'claude' : isCursor ? 'cursor' : isZcode ? 'zcode' : 'codex',
+          originator: isBridge ? 'Bridge / IM' : isKimi ? 'Kimi Code' : isClaude ? 'Claude Code' : isCursor ? 'Cursor Agent' : isZcode ? 'ZCode' : isAntigravity ? 'Antigravity' : 'Codex Native',
+          source: isBridge ? 'bridge' : isKimi ? 'kimi' : isClaude ? 'claude' : isCursor ? 'cursor' : isZcode ? 'zcode' : isAntigravity ? 'antigravity' : 'codex',
           creatorKind: isBridge ? 'bridge' : 'native',
           creatorLabel: isBridge ? 'Bridge' : 'Native',
           creatorClass: isBridge ? 'bridge' : 'native',
@@ -581,6 +615,11 @@ export function uiClientScript(runtimeStatusSource: string): string {
           zcodeProvider: document.getElementById('zcodeProvider').value,
           zcodeDefaultModel: document.getElementById('zcodeDefaultModel').value,
           zcodeMode: document.getElementById('zcodeMode').value,
+          antigravityProvider: document.getElementById('antigravityProvider').value,
+          antigravityDefaultModel: document.getElementById('antigravityDefaultModel').value,
+          antigravityMode: document.getElementById('antigravityMode').value,
+          antigravityReasoningEffort: document.getElementById('antigravityReasoningEffort').value,
+          antigravitySandbox: document.getElementById('antigravitySandbox').checked,
           uiAllowLan: document.getElementById('uiAllowLan').checked,
           uiAccessToken: document.getElementById('uiAccessToken').value,
         };
@@ -714,7 +753,7 @@ export function uiClientScript(runtimeStatusSource: string): string {
       }
 
       function setActiveConfigTab(tab) {
-        const nextTab = ['common', 'codex', 'claude', 'kimi', 'cursor', 'zcode', 'web'].includes(tab) ? tab : 'common';
+        const nextTab = ['common', 'codex', 'claude', 'kimi', 'cursor', 'zcode', 'antigravity', 'web'].includes(tab) ? tab : 'common';
         state.activeConfigTab = nextTab;
         document.querySelectorAll('[data-config-tab]').forEach((element) => {
           const active = element.dataset.configTab === nextTab;
@@ -923,7 +962,7 @@ export function uiClientScript(runtimeStatusSource: string): string {
       }
 
       function renderRuntimeStatuses() {
-        for (const runtime of ['codex', 'claude', 'kimi', 'cursor', 'zcode']) {
+        for (const runtime of ['codex', 'claude', 'kimi', 'cursor', 'zcode', 'antigravity']) {
           const projection = runtimeStatusProjection(runtime);
           const item = document.querySelector('.runtime-status-item[data-runtime="' + runtime + '"]');
           if (item) {
@@ -975,6 +1014,11 @@ export function uiClientScript(runtimeStatusSource: string): string {
         zcodeProvider: '默认 ZCode Provider',
         zcodeDefaultModel: 'ZCode 默认模型',
         zcodeMode: 'ZCode 默认模式',
+        antigravityProvider: '默认 Antigravity Provider',
+        antigravityDefaultModel: 'Antigravity 默认模型',
+        antigravityMode: 'Antigravity 默认模式',
+        antigravityReasoningEffort: 'Antigravity 思考级别',
+        antigravitySandbox: 'Antigravity sandbox',
         uiAllowLan: '允许局域网访问 Web 控制台',
         uiAccessToken: '局域网访问 token',
       };
@@ -1012,6 +1056,11 @@ export function uiClientScript(runtimeStatusSource: string): string {
         'zcodeProvider',
         'zcodeDefaultModel',
         'zcodeMode',
+        'antigravityProvider',
+        'antigravityDefaultModel',
+        'antigravityMode',
+        'antigravityReasoningEffort',
+        'antigravitySandbox',
         'uiAllowLan',
         'uiAccessToken',
       ]);
@@ -1348,6 +1397,9 @@ export function uiClientScript(runtimeStatusSource: string): string {
         const zcodePhysical = Number.isFinite(Number(counts.zcodePhysical))
           ? Number(counts.zcodePhysical)
           : allSessions.filter((session) => session.kind === 'zcode').length;
+        const antigravityPhysical = Number.isFinite(Number(counts.antigravityPhysical))
+          ? Number(counts.antigravityPhysical)
+          : allSessions.filter((session) => session.kind === 'antigravity').length;
         const bridgeStored = Number.isFinite(Number(counts.bridgeStored))
           ? Number(counts.bridgeStored)
           : allSessions.filter((session) => session.kind === 'bridge').length;
@@ -1365,8 +1417,9 @@ export function uiClientScript(runtimeStatusSource: string): string {
           + ' · Kimi ' + kimiPhysical + ' 条'
           + ' · Cursor ' + cursorPhysical + ' 条'
           + ' · ZCode ' + zcodePhysical + ' 条'
+          + ' · Antigravity ' + antigravityPhysical + ' 条'
           + ' · Bridge 存储 ' + bridgeStored + ' 条'
-          + (bridgeWithoutCodexThread > 0 ? '（' + bridgeWithoutCodexThread + ' 条没有 Codex thread；可能是 Claude、Kimi、Cursor、ZCode 或纯 Bridge 会话）' : '')
+          + (bridgeWithoutCodexThread > 0 ? '（' + bridgeWithoutCodexThread + ' 条没有 Codex thread；可能是 Claude、Kimi、Cursor、ZCode、Antigravity 或纯 Bridge 会话）' : '')
           + (dedupedBridgeRows > 0 ? ' · 已按 runtime identity 合并 ' + dedupedBridgeRows + ' 条重复映射' : '');
         setText('runtimeSessionsRootStatus', state.codexRoot);
 
@@ -1707,6 +1760,11 @@ export function uiClientScript(runtimeStatusSource: string): string {
         document.getElementById('zcodeProvider').value = config.zcodeProvider || 'tmux';
         document.getElementById('zcodeDefaultModel').value = config.zcodeDefaultModel || '';
         document.getElementById('zcodeMode').value = config.zcodeMode || 'build';
+        document.getElementById('antigravityProvider').value = config.antigravityProvider || 'acp';
+        document.getElementById('antigravityDefaultModel').value = config.antigravityDefaultModel || '';
+        document.getElementById('antigravityMode').value = config.antigravityMode || 'default';
+        document.getElementById('antigravityReasoningEffort').value = config.antigravityReasoningEffort || '';
+        document.getElementById('antigravitySandbox').checked = config.antigravitySandbox === true;
         document.getElementById('uiAllowLan').checked = config.uiAllowLan === true;
         document.getElementById('uiAccessToken').value = config.uiAccessToken || '';
         renderUiAccess();
@@ -1879,6 +1937,7 @@ export function uiClientScript(runtimeStatusSource: string): string {
         if (source === 'kimi') return 'Kimi Code';
         if (source === 'cursor') return 'Cursor Agent';
         if (source === 'zcode') return 'ZCode';
+        if (source === 'antigravity') return 'Antigravity';
         return source === 'bridge' ? 'Bridge / IM' : 'Codex Native';
       }
 
@@ -2146,18 +2205,22 @@ export function uiClientScript(runtimeStatusSource: string): string {
               ? 'cursor'
               : config.activeRuntime === 'zcode'
                 ? 'zcode'
-              : 'codex';
+                : config.activeRuntime === 'antigravity'
+                  ? 'antigravity'
+                  : 'codex';
         state.activeSessionConfigRuntime = activeRuntime;
         const isClaude = activeRuntime === 'claude';
         const isKimi = activeRuntime === 'kimi';
         const isCursor = activeRuntime === 'cursor';
         const isZcode = activeRuntime === 'zcode';
-        document.getElementById('sessionConfigCodexBlock').hidden = isClaude || isKimi || isCursor || isZcode;
-        document.getElementById('sessionConfigCodexSandboxBlock').hidden = isClaude || isKimi || isCursor || isZcode;
+        const isAntigravity = activeRuntime === 'antigravity';
+        document.getElementById('sessionConfigCodexBlock').hidden = isClaude || isKimi || isCursor || isZcode || isAntigravity;
+        document.getElementById('sessionConfigCodexSandboxBlock').hidden = isClaude || isKimi || isCursor || isZcode || isAntigravity;
         document.getElementById('sessionConfigClaudeBlock').hidden = !isClaude;
         document.getElementById('sessionConfigKimiBlock').hidden = !isKimi;
         document.getElementById('sessionConfigCursorBlock').hidden = !isCursor;
         document.getElementById('sessionConfigZcodeBlock').hidden = !isZcode;
+        document.getElementById('sessionConfigAntigravityBlock').hidden = !isAntigravity;
         document.getElementById('sessionConfigName').value = config.name || config.title || '';
         document.getElementById('sessionConfigCwd').value = config.workingDirectory || '';
         renderModelOptionsForSelect(document.getElementById('sessionConfigModel'), config.model || '', '跟随全局 / Codex 默认模型');
@@ -2182,6 +2245,13 @@ export function uiClientScript(runtimeStatusSource: string): string {
         document.getElementById('sessionConfigZcodeModel').value = config.zcodeModel || '';
         document.getElementById('sessionConfigZcodeProvider').value = config.zcodeProvider || '';
         document.getElementById('sessionConfigZcodeMode').value = config.zcodeMode || '';
+        document.getElementById('sessionConfigAntigravityModel').value = config.antigravityModel || '';
+        document.getElementById('sessionConfigAntigravityProvider').value = config.antigravityProvider || '';
+        document.getElementById('sessionConfigAntigravityMode').value = config.antigravityMode || '';
+        document.getElementById('sessionConfigAntigravityReasoning').value = config.antigravityReasoningEffort || '';
+        document.getElementById('sessionConfigAntigravitySandbox').value = config.antigravitySandbox === undefined
+          ? ''
+          : config.antigravitySandbox === true ? 'on' : 'off';
         document.getElementById('sessionConfigPrompt').value = config.systemPrompt || '';
       }
 
@@ -2213,6 +2283,13 @@ export function uiClientScript(runtimeStatusSource: string): string {
           zcodeModel: document.getElementById('sessionConfigZcodeModel').value,
           zcodeProvider: document.getElementById('sessionConfigZcodeProvider').value,
           zcodeMode: document.getElementById('sessionConfigZcodeMode').value,
+          antigravityModel: document.getElementById('sessionConfigAntigravityModel').value,
+          antigravityProvider: document.getElementById('sessionConfigAntigravityProvider').value,
+          antigravityMode: document.getElementById('sessionConfigAntigravityMode').value,
+          antigravityReasoningEffort: document.getElementById('sessionConfigAntigravityReasoning').value,
+          antigravitySandbox: document.getElementById('sessionConfigAntigravitySandbox').value === ''
+            ? ''
+            : document.getElementById('sessionConfigAntigravitySandbox').value === 'on',
           systemPrompt: document.getElementById('sessionConfigPrompt').value,
         };
       }

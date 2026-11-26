@@ -563,7 +563,7 @@ async function handleCurrentRuntimeCommand(options: {
   if (cursorPage.invalid) return { response: 'Cursor 模型分页参数无效，请重新打开配置卡。' };
   const section = parseCurrentConfigSectionArg(cursorPage.args);
   if (!section) {
-    return { response: '请选择有效配置分栏：common、codex、claude、kimi、cursor 或 zcode。' };
+    return { response: '请选择有效配置分栏：common、codex、claude、kimi、cursor、zcode 或 antigravity。' };
   }
 
   const session = options.store.getSession(binding.bridgeSessionId);
@@ -578,15 +578,16 @@ async function handleCurrentRuntimeCommand(options: {
   };
 }
 
-function parseCurrentRuntimeArg(args: string): 'codex' | 'claude' | 'kimi' | 'cursor' | 'zcode' | undefined {
+function parseCurrentRuntimeArg(args: string): 'codex' | 'claude' | 'kimi' | 'cursor' | 'zcode' | 'antigravity' | undefined {
   const section = parseCurrentConfigSectionArg(args);
   return section === 'common' ? undefined : section;
 }
 
 function parseCurrentConfigSectionArg(args: string): CurrentSessionConfigSection | undefined {
   const parts = args.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  const runtime = parts[0] === 'runtime' ? parts[1] : parts[0];
-  return runtime === 'common' || runtime === 'codex' || runtime === 'claude' || runtime === 'kimi' || runtime === 'cursor' || runtime === 'zcode'
+  const rawRuntime = parts[0] === 'runtime' ? parts[1] : parts[0];
+  const runtime = rawRuntime === 'agy' ? 'antigravity' : rawRuntime;
+  return runtime === 'common' || runtime === 'codex' || runtime === 'claude' || runtime === 'kimi' || runtime === 'cursor' || runtime === 'zcode' || runtime === 'antigravity'
     ? runtime
     : undefined;
 }

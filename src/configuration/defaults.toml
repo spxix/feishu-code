@@ -48,6 +48,13 @@ model = ""
 provider = "tmux"
 mode = "build"
 
+[runtime.antigravity]
+model = ""
+provider = "acp"
+mode = "default"
+reasoning_effort = ""
+sandbox = false
+
 [[channels]]
 id = "feishu-default"
 alias = "飞书"

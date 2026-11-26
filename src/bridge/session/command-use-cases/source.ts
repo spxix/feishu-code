@@ -25,6 +25,12 @@ import {
   findZcodeSessionById,
   listZcodeSessionSummaries,
 } from '../../../runtime/zcode/session-index.js';
+import {
+  archiveAntigravitySession,
+  findAntigravitySessionById,
+  isAntigravityUserInputLine,
+  listAntigravitySessionSummaries,
+} from '../../../runtime/antigravity/session-index.js';
 import type { LocalRuntimeSessionSummary } from '../local-runtime-session.js';
 import { validateSessionId } from '../../../shared/security/validators.js';
 import { userInputTurnCountCache } from './user-input-turn-cache.js';
@@ -32,7 +38,7 @@ import { userInputTurnCountCache } from './user-input-turn-cache.js';
 export type { CodexSessionSummary };
 export type { LocalRuntimeSessionSummary };
 
-export type LocalRuntimeFilter = 'codex' | 'claude' | 'kimi' | 'cursor' | 'zcode';
+export type LocalRuntimeFilter = 'codex' | 'claude' | 'kimi' | 'cursor' | 'zcode' | 'antigravity';
 
 function isSafeLocalRuntimeThreadId(id: string): boolean {
   const trimmed = id.trim();
@@ -210,6 +216,28 @@ function toZcodeRuntimeSession(session: ReturnType<typeof listZcodeSessionSummar
   };
 }
 
+function listCommandAntigravityThreads(limit?: number): LocalRuntimeSessionSummary[] {
+  return listAntigravitySessionSummaries(limit).map(toAntigravityRuntimeSession);
+}
+
+function toAntigravityRuntimeSession(session: ReturnType<typeof listAntigravitySessionSummaries>[number]): LocalRuntimeSessionSummary {
+  return {
+    runtime: 'antigravity',
+    threadId: session.sessionId,
+    filePath: session.filePath,
+    cwd: session.cwd || '',
+    originator: 'Antigravity',
+    source: 'antigravity',
+    firstSeenAt: session.createdAt || session.updatedAt || new Date(0).toISOString(),
+    lastEventAt: session.updatedAt || session.createdAt || new Date(0).toISOString(),
+    title: session.title || session.sessionId.slice(0, 8),
+    activeEstimate: false,
+    userInputTurns: session.filePath.endsWith('.jsonl')
+      ? userInputTurnCountCache.get('antigravity', session.filePath, isAntigravityUserInputLine)
+      : undefined,
+  };
+}
+
 function sortRuntimeSessionsByActivity(sessions: LocalRuntimeSessionSummary[]): LocalRuntimeSessionSummary[] {
   return sessions.sort((left, right) => right.lastEventAt.localeCompare(left.lastEventAt));
 }
@@ -230,7 +258,8 @@ export function listCommandLocalRuntimeSessions(limit?: number, runtime?: LocalR
     const kimi = runtime && runtime !== 'kimi' ? [] : listCommandKimiThreads(limit);
     const cursor = runtime && runtime !== 'cursor' ? [] : listCommandCursorThreads(limit);
     const zcode = runtime && runtime !== 'zcode' ? [] : listCommandZcodeThreads(limit);
-    return sortRuntimeSessionsByActivity([...codex, ...claude, ...kimi, ...cursor, ...zcode])
+    const antigravity = runtime && runtime !== 'antigravity' ? [] : listCommandAntigravityThreads(limit);
+    return sortRuntimeSessionsByActivity([...codex, ...claude, ...kimi, ...cursor, ...zcode, ...antigravity])
       .slice(0, typeof limit === 'number' && Number.isFinite(limit) && limit > 0 ? Math.max(1, Math.floor(limit)) : undefined);
   } catch (error) {
     console.error('[command-session-source] Failed to list local runtime sessions:', error);
@@ -309,6 +338,16 @@ export function archiveCommandZcodeThread(threadId: string, cwd: string | undefi
   }
 }
 
+export function archiveCommandAntigravityThread(threadId: string, cwd: string | undefined): LocalRuntimeSessionSummary | null {
+  try {
+    const archived = archiveAntigravitySession(threadId, cwd);
+    return archived ? toAntigravityRuntimeSession(archived) : null;
+  } catch (error) {
+    console.error(`[command-session-source] Failed to archive Antigravity thread ${threadId}:`, error);
+    return null;
+  }
+}
+
 export function getCommandCodexThreadByIdSafe(
   rawThreadId: string,
   context: string,
@@ -356,6 +395,8 @@ export function getCommandLocalRuntimeThreadByIdSafe(
       }
       const zcode = findZcodeSessionById(threadId, cwd);
       if (zcode) return { threadId, thread: toZcodeRuntimeSession(zcode) };
+      const antigravity = findAntigravitySessionById(threadId, cwd);
+      if (antigravity) return { threadId, thread: toAntigravityRuntimeSession(antigravity) };
     }
     const claudeMatches = listClaudeSessionJsonlSummaries()
       .filter((session) => session.sessionId === threadId);
@@ -372,6 +413,8 @@ export function getCommandLocalRuntimeThreadByIdSafe(
     }
     const zcode = findZcodeSessionById(threadId);
     if (zcode) return { threadId, thread: toZcodeRuntimeSession(zcode) };
+    const antigravity = findAntigravitySessionById(threadId);
+    if (antigravity) return { threadId, thread: toAntigravityRuntimeSession(antigravity) };
     return { threadId };
   } catch (error) {
     console.error(

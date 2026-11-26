@@ -47,13 +47,13 @@ export interface FeishuCredentials {
 }
 
 export interface RuntimeRecommendation {
-  runtime: 'codex' | 'claude' | 'kimi' | 'cursor' | 'zcode';
+  runtime: 'codex' | 'claude' | 'kimi' | 'cursor' | 'zcode' | 'antigravity';
   claudeExecutable?: ClaudeExecutable;
   reason: string;
 }
 
 type SetupMode = 'existing' | 'qr' | 'manual';
-type RuntimeChoice = 'codex' | 'ccr' | 'claude' | 'kimi' | 'cursor' | 'zcode';
+type RuntimeChoice = 'codex' | 'ccr' | 'claude' | 'kimi' | 'cursor' | 'zcode' | 'antigravity';
 type LarkCliRunOptions = {
   homeDir?: string;
   input?: string;
@@ -116,10 +116,16 @@ export function recommendRuntime(homeDir = os.homedir()): RuntimeRecommendation 
       reason: '检测到 ~/.zcode，默认使用 ZCode。',
     };
   }
+  if (fs.existsSync(path.join(homeDir, '.gemini', 'antigravity-cli'))) {
+    return {
+      runtime: 'antigravity',
+      reason: '检测到 ~/.gemini/antigravity-cli，默认使用 Antigravity。',
+    };
+  }
   return {
     runtime: 'claude',
     claudeExecutable: 'claude',
-    reason: '未检测到 Codex、Claude Code Router、Kimi Code、Cursor Agent 或 ZCode 配置，默认使用 Claude Code。',
+    reason: '未检测到 Codex、Claude Code Router、Kimi Code、Cursor Agent、ZCode 或 Antigravity 配置，默认使用 Claude Code。',
   };
 }
 
@@ -128,6 +134,7 @@ export function runtimeChoiceToConfig(choice: RuntimeChoice): NonNullable<Config
   if (choice === 'kimi') return { agent: 'kimi', kimi: { provider: 'tmux' } };
   if (choice === 'cursor') return { agent: 'cursor', cursor: { provider: 'tmux' } };
   if (choice === 'zcode') return { agent: 'zcode', zcode: { provider: 'tmux' } };
+  if (choice === 'antigravity') return { agent: 'antigravity', antigravity: { provider: 'acp' } };
   return {
     agent: 'claude',
     claude: {
@@ -142,6 +149,7 @@ export function recommendedRuntimeChoice(recommendation: RuntimeRecommendation):
   if (recommendation.runtime === 'kimi') return 'kimi';
   if (recommendation.runtime === 'cursor') return 'cursor';
   if (recommendation.runtime === 'zcode') return 'zcode';
+  if (recommendation.runtime === 'antigravity') return 'antigravity';
   return recommendation.claudeExecutable === 'ccr' ? 'ccr' : 'claude';
 }
 
@@ -226,6 +234,15 @@ export function buildSetupConfig(
         model: runtimeConfig.zcode?.model ?? current.runtime.zcode.model,
         mode: runtimeConfig.zcode?.mode ?? current.runtime.zcode.mode,
         provider: 'tmux',
+      },
+      antigravity: {
+        ...current.runtime.antigravity,
+        ...(runtimeConfig.antigravity || {}),
+        model: runtimeConfig.antigravity?.model ?? current.runtime.antigravity.model,
+        mode: runtimeConfig.antigravity?.mode ?? current.runtime.antigravity.mode,
+        reasoningEffort: runtimeConfig.antigravity?.reasoningEffort ?? current.runtime.antigravity.reasoningEffort,
+        sandbox: runtimeConfig.antigravity?.sandbox ?? current.runtime.antigravity.sandbox,
+        provider: 'acp',
       },
     },
     bridge: {
@@ -881,6 +898,7 @@ async function promptRuntime(homeDir: string): Promise<RuntimeChoice> {
       { value: 'kimi', label: 'Kimi Code', hint: '写入 runtime=kimi，provider=tmux' },
       { value: 'cursor', label: 'Cursor Agent', hint: '写入 runtime=cursor，provider=tmux' },
       { value: 'zcode', label: 'ZCode', hint: '写入 runtime=zcode，provider=tmux' },
+      { value: 'antigravity', label: 'Antigravity', hint: '写入 runtime=antigravity，provider=acp（无需 tmux）' },
     ],
   }));
 }
@@ -1072,7 +1090,9 @@ export async function runSetupWizard(options: SetupOptions = {}): Promise<void> 
           ? 'Cursor Agent'
           : runtimeChoice === 'zcode'
             ? 'ZCode'
-        : 'Claude Code';
+            : runtimeChoice === 'antigravity'
+              ? 'Antigravity'
+              : 'Claude Code';
   let botChatUrl: string | undefined;
   const botLinkSpinner = p.spinner();
   botLinkSpinner.start('生成机器人私聊入口');

@@ -5,18 +5,22 @@ export type CodexReasoningEffort = 'minimal' | 'low' | 'medium' | 'high' | 'xhig
 export type KimiThinkingMode = 'default' | 'on' | 'off';
 export type CursorReasoningEffort = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 export type ZcodeMode = 'build' | 'edit' | 'plan' | 'yolo';
+export type AntigravityMode = 'default' | 'accept-edits' | 'auto' | 'plan' | 'yolo';
+export type AntigravityReasoningEffort = 'low' | 'medium' | 'high' | 'xhigh';
 export type RuntimeProviderChoice = 'sdk' | 'pty' | 'tmux';
 export type ClaudeProviderChoice = RuntimeProviderChoice;
 export type KimiProviderChoice = 'tmux';
 export type CursorProviderChoice = 'tmux' | 'acp';
 export type CursorTransport = 'cli' | 'desktop';
 export type ZcodeProviderChoice = 'tmux';
-export type RuntimeAgent = 'codex' | 'claude' | 'kimi' | 'cursor' | 'zcode';
+export type AntigravityProviderChoice = 'acp';
+export type RuntimeAgent = 'codex' | 'claude' | 'kimi' | 'cursor' | 'zcode' | 'antigravity';
 export type RuntimeProviderIdentity =
   | `${'codex' | 'claude'}:${RuntimeProviderChoice}`
   | `kimi:${KimiProviderChoice}`
   | `cursor:${CursorProviderChoice}`
-  | `zcode:${ZcodeProviderChoice}`;
+  | `zcode:${ZcodeProviderChoice}`
+  | `antigravity:${AntigravityProviderChoice}`;
 export type ClaudeExecutable = 'claude' | 'ccr';
 
 export type BridgeSessionHealthStatus =
@@ -120,7 +124,8 @@ export type BridgeSessionRuntimeState =
   | BridgeSessionClaudeRuntimeContainer
   | BridgeSessionKimiRuntimeContainer
   | BridgeSessionCursorRuntimeContainer
-  | BridgeSessionZcodeRuntimeContainer;
+  | BridgeSessionZcodeRuntimeContainer
+  | BridgeSessionAntigravityRuntimeContainer;
 
 export interface BridgeSessionCodexRuntimeContainer {
   activeRuntime?: 'codex';
@@ -129,6 +134,7 @@ export interface BridgeSessionCodexRuntimeContainer {
   kimi?: never;
   cursor?: never;
   zcode?: never;
+  antigravity?: never;
   general?: BridgeSessionGeneralState;
 }
 
@@ -139,6 +145,7 @@ export interface BridgeSessionClaudeRuntimeContainer {
   kimi?: never;
   cursor?: never;
   zcode?: never;
+  antigravity?: never;
   general?: BridgeSessionGeneralState;
 }
 
@@ -149,6 +156,7 @@ export interface BridgeSessionKimiRuntimeContainer {
   kimi?: BridgeSessionKimiRuntimeState;
   cursor?: never;
   zcode?: never;
+  antigravity?: never;
   general?: BridgeSessionGeneralState;
 }
 
@@ -159,6 +167,7 @@ export interface BridgeSessionCursorRuntimeContainer {
   kimi?: never;
   cursor?: BridgeSessionCursorRuntimeState;
   zcode?: never;
+  antigravity?: never;
   general?: BridgeSessionGeneralState;
 }
 
@@ -169,6 +178,18 @@ export interface BridgeSessionZcodeRuntimeContainer {
   kimi?: never;
   cursor?: never;
   zcode?: BridgeSessionZcodeRuntimeState;
+  antigravity?: never;
+  general?: BridgeSessionGeneralState;
+}
+
+export interface BridgeSessionAntigravityRuntimeContainer {
+  activeRuntime: 'antigravity';
+  codex?: never;
+  claude?: never;
+  kimi?: never;
+  cursor?: never;
+  zcode?: never;
+  antigravity?: BridgeSessionAntigravityRuntimeState;
   general?: BridgeSessionGeneralState;
 }
 
@@ -231,6 +252,16 @@ export interface BridgeSessionZcodeRuntimeState {
   mode?: ZcodeMode;
 }
 
+export interface BridgeSessionAntigravityRuntimeState {
+  sessionId?: string;
+  cwd?: string;
+  model?: string;
+  provider?: AntigravityProviderChoice;
+  mode?: AntigravityMode;
+  reasoningEffort?: AntigravityReasoningEffort;
+  sandbox?: boolean;
+}
+
 export interface BridgeSessionGeneralState {
   workingDirectory?: string;
   systemPrompt?: string;
@@ -248,6 +279,7 @@ export type BridgeSessionUpdate = Omit<Partial<BridgeSession>, 'runtime'> & {
 	    kimi?: Partial<BridgeSessionKimiRuntimeState>;
 	    cursor?: Partial<BridgeSessionCursorRuntimeState>;
 	    zcode?: Partial<BridgeSessionZcodeRuntimeState>;
+	    antigravity?: Partial<BridgeSessionAntigravityRuntimeState>;
 	    general?: Partial<BridgeSessionGeneralState>;
 	  };
 	};

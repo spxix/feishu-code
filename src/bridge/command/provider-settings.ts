@@ -36,6 +36,7 @@ import {
   restartZcodeTmuxInputSession,
   zcodeTmuxSessionName,
 } from '../../runtime/zcode/tmux-provider.js';
+import { closeAntigravityAcpSession } from '../../runtime/antigravity/acp-provider.js';
 import {
   ClaudeTmuxLaunchError,
   CodexResumeTmuxLaunchError,
@@ -95,6 +96,20 @@ function setSessionClaudeProviderToml(sessionId: string, provider: RuntimeProvid
   createConfigService({ migrate: false }).set(
     { kind: 'session', sessionId },
     { runtime: { claude: { provider } } },
+  );
+}
+
+function setSessionAntigravityProviderToml(sessionId: string): void {
+  createConfigService({ migrate: false }).set(
+    { kind: 'session', sessionId },
+    { runtime: { antigravity: { provider: 'acp' } } },
+  );
+}
+
+function clearSessionAntigravityProviderToml(sessionId: string): void {
+  createConfigService({ migrate: false }).unset(
+    { kind: 'session', sessionId },
+    'runtime.antigravity.provider',
   );
 }
 
@@ -795,6 +810,37 @@ async function applyProviderCommand(options: ProviderCommandOptions, confirmedCu
         prepared.existed ? '同名 tmux session 已先销毁并以原 ZCode session 重启。' : '已启动 ZCode TUI。',
         '之后的普通消息与 `//` 转义后的原生命令都会进入该 ZCode TUI。',
       ],
+      options.markdown,
+    );
+  }
+  if (getSessionActiveRuntime(session) === 'antigravity') {
+    const requested = options.args.trim().toLowerCase();
+    if (!requested) {
+      return buildCommandFields(
+        '当前 Antigravity Provider',
+        [['Runtime', 'antigravity'], ['Provider', 'acp']],
+        ['Antigravity 通过 `agy acp`（Agent Client Protocol）运行；发送 `/p acp` 会关闭并重置当前 ACP 进程，`/p default` 清除会话级覆盖。'],
+        options.markdown,
+      );
+    }
+    if (requested === 'default') {
+      clearSessionAntigravityProviderToml(session.id);
+      return buildCommandFields('已恢复默认 Antigravity Provider', [['Runtime', 'antigravity'], ['Provider', 'acp']], [], options.markdown);
+    }
+    if (requested !== 'acp') {
+      return buildCommandFields(
+        'Antigravity Provider 用法',
+        [['命令', '`/provider acp|default` 或 `/p acp|default`']],
+        ['Antigravity 当前只支持 `acp` Provider。'],
+        options.markdown,
+      );
+    }
+    await closeAntigravityAcpSession(session.id);
+    setSessionAntigravityProviderToml(session.id);
+    return buildCommandFields(
+      'Antigravity Provider · acp 已重置',
+      [['Runtime', 'antigravity'], ['Provider', 'acp']],
+      ['已关闭当前会话缓存的 `agy acp` 进程；下一条消息将按最新配置重新启动并恢复会话。'],
       options.markdown,
     );
   }

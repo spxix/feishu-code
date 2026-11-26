@@ -35,6 +35,9 @@ import {
 } from '../../domain/session-runtime.js';
 import type { ChannelChat } from '../../domain/channel.js';
 import type {
+  AntigravityMode,
+  AntigravityProviderChoice,
+  AntigravityReasoningEffort,
   BridgeSession,
   BridgeSessionClaudeRuntimeState,
   BridgeSessionCodexRuntimeState,
@@ -206,6 +209,15 @@ export interface ZcodeRuntimeConfig {
   mode: ZcodeMode;
 }
 
+export interface AntigravityRuntimeConfig {
+  runtime: 'antigravity';
+  provider: AntigravityProviderChoice;
+  model?: string;
+  mode: AntigravityMode;
+  reasoningEffort?: AntigravityReasoningEffort;
+  sandbox: boolean;
+}
+
 export interface RuntimeMetadataConfig {
   runtime: RuntimeAgent;
   reasoningEffort: string;
@@ -282,6 +294,9 @@ export function resolveEffectiveRuntimeMode(
   if (activeRuntime === 'zcode') {
     return resolveZcodeRuntimeConfig(session, binding).mode === 'yolo' ? 'yolo' : 'normal';
   }
+  if (activeRuntime === 'antigravity') {
+    return resolveAntigravityRuntimeConfig(session, binding).mode === 'yolo' ? 'yolo' : 'normal';
+  }
   return resolveEffectiveMode(binding, session);
 }
 
@@ -303,7 +318,7 @@ export function hasSessionCodexProviderOverride(session?: BridgeSession | null):
 
 export interface EffectiveRuntimeProvider {
   runtime: RuntimeAgent;
-  provider: RuntimeProviderChoice | KimiProviderChoice | CursorProviderChoice | ZcodeProviderChoice;
+  provider: RuntimeProviderChoice | KimiProviderChoice | CursorProviderChoice | ZcodeProviderChoice | AntigravityProviderChoice;
   identity: RuntimeProviderIdentity;
 }
 
@@ -313,7 +328,9 @@ export function resolveEffectiveRuntimeProvider(
 ): EffectiveRuntimeProvider {
   const configuredRuntime = scopedConfigForRuntime(binding, session).config.runtime.agent;
   const runtime = getSessionActiveRuntime(session) || configuredRuntime;
-  const provider = runtime === 'zcode'
+  const provider = runtime === 'antigravity'
+    ? resolveAntigravityRuntimeConfig(session, binding).provider
+    : runtime === 'zcode'
     ? resolveZcodeRuntimeConfig(session, binding).provider
     : runtime === 'cursor'
     ? resolveCursorRuntimeConfig(session, binding).provider
@@ -488,6 +505,18 @@ export function resolveZcodeRuntimeConfig(session?: BridgeSession | null, bindin
   };
 }
 
+export function resolveAntigravityRuntimeConfig(session?: BridgeSession | null, binding?: ChannelChat | null): AntigravityRuntimeConfig {
+  const { config } = scopedConfigForRuntime(binding, session);
+  return {
+    runtime: 'antigravity',
+    provider: 'acp',
+    model: config.runtime.antigravity.model.trim() || undefined,
+    mode: config.runtime.antigravity.mode,
+    ...(config.runtime.antigravity.reasoningEffort ? { reasoningEffort: config.runtime.antigravity.reasoningEffort } : {}),
+    sandbox: config.runtime.antigravity.sandbox === true,
+  };
+}
+
 export function resolveRuntimeMetadataConfig(
   session: BridgeSession | null | undefined,
   runtime: RuntimeAgent = session?.runtime?.activeRuntime === 'claude'
@@ -498,6 +527,8 @@ export function resolveRuntimeMetadataConfig(
         ? 'cursor'
         : session?.runtime?.activeRuntime === 'zcode'
           ? 'zcode'
+          : session?.runtime?.activeRuntime === 'antigravity'
+            ? 'antigravity'
         : 'codex',
   binding?: ChannelChat | null,
 ): RuntimeMetadataConfig {
@@ -531,6 +562,14 @@ export function resolveRuntimeMetadataConfig(
       runtime: 'zcode',
       reasoningEffort: '',
       model: zcodeConfig.model || 'default',
+    };
+  }
+  if (runtime === 'antigravity') {
+    const agConfig = resolveAntigravityRuntimeConfig(session, binding);
+    return {
+      runtime: 'antigravity',
+      reasoningEffort: agConfig.reasoningEffort || '',
+      model: agConfig.model || 'default',
     };
   }
   const codexThreadId = getSessionCodexThreadId(session);

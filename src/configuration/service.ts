@@ -113,6 +113,9 @@ function patchPaths(patch: ConfigPatch): ConfigPath[] {
   if (patch.runtime?.zcode) {
     for (const key of Object.keys(patch.runtime.zcode)) paths.push(`runtime.zcode.${key}`);
   }
+  if (patch.runtime?.antigravity) {
+    for (const key of Object.keys(patch.runtime.antigravity)) paths.push(`runtime.antigravity.${key}`);
+  }
   for (const channel of patch.channels || []) {
     if (channel.enabled !== undefined) paths.push('channels[].enabled');
     if (channel.config) {

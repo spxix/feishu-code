@@ -14,7 +14,7 @@
 
 | 能力 | 怎么用 | 入口 |
 | --- | --- | --- |
-| 共享本地 runtime 会话 | 在飞书上继续本地 Codex / Claude Code / Kimi Code / Cursor Agent / ZCode 对话，用可视化面板选择要接管的线程。 | `/t` |
+| 共享本地 runtime 会话 | 在飞书上继续本地 Codex / Claude Code / Kimi Code / Cursor Agent / ZCode / Antigravity 对话，用可视化面板选择要接管的线程。 | `/t` |
 | 流式卡片输出 | 将模型思考、工具调用、长任务进度和最终结果渲染成飞书卡片，对话留痕且可追踪。 | 普通消息 |
 | 群聊 = Session | 一个群聊对应一个 session，用群聊名称管理任务；多线并行时一键拉起新群。 | `/new`、`/t rename <名称>` |
 | Multi-Agent 协作 | Agent 可以发现其他 CodeLark 群聊、创建专用任务群，并把普通输入或 slash 命令交给另一个 Agent；两端都会显示可核对的收发卡片。 | 自然语言委派、`codelark sessions` |
@@ -55,11 +55,12 @@
 ### 依赖
 
 - Node.js 24+
-- 全局环境中已有 `codex` / `claude-code-router` / `claude-code` / `kimi` 其中之一，或当前系统用户已有对应登录态/API 凭据。
+- 全局环境中已有 `codex` / `claude-code-router` / `claude-code` / `kimi` / `agent` / `zcode` / `agy`（Antigravity CLI）其中之一，或当前系统用户已有对应登录态/API 凭据。
+- 手动创建飞书/Lark 自建应用（不走扫码）请看：[手动飞书应用配置指南（Manual Custom App Setup）](docs/guide/platform-setup.md)。
 
 ### 安装
 
-- CodeLark 默认使用 tmux 驱动本地 agent
+- CodeLark 默认使用 tmux 驱动本地 TUI agent（**Antigravity 直接走 `agy acp` 协议，无需 tmux**）
   - macOS
   ```sh
   # 安装Homebrew
@@ -117,9 +118,10 @@ npx --yes --package=npm@11.6.2 -c 'codelark_pkg=$(npm pack "git+https://github.c
 - `/p tmux`：当前本地 TUI 已退出时重新启动。
 - `/runtime cursor`：切换到 Cursor Agent；原生 Cursor slash 命令使用 `/tmux /<command>`，例如 `/tmux /mcp list`。
 - `/runtime zcode`：切换到 ZCode；普通消息进入受 CodeLark 管理的 ZCode tmux TUI，原生 slash 命令使用 `//`，例如 `//goal`。
-- `/reasoning`：查看或修改当前 runtime 的思考设置；Codex 支持 `max/ultra`，Kimi 使用 `on/off`，Cursor 使用模型 effort；ZCode 保留自身原生命令，不由 CodeLark 硬映射。
+- `/runtime antigravity`（别名 `/runtime agy`）：切换到 Antigravity；通过本机 `agy acp` 协议运行（无需 tmux），支持 `/model`、`/mode`（`default|accept-edits|auto|plan|yolo`）、`/r`（`low|medium|high|xhigh`）、`/sb`（sandbox）以及 `//...` 透传原生 slash 命令。
+- `/reasoning`：查看或修改当前 runtime 的思考设置；Codex 支持 `max/ultra`，Kimi 使用 `on/off`，Cursor 使用模型 effort，Antigravity 支持 `low|medium|high|xhigh`；ZCode 保留自身原生命令，不由 CodeLark 硬映射。
 - `/stop`：停止当前任务
-- `/t`：查看最近本地 Codex / Claude Code / Kimi Code / Cursor Agent / ZCode 会话。
+- `/t`：查看最近本地 Codex / Claude Code / Kimi Code / Cursor Agent / ZCode / Antigravity 会话。
 - `/t rename <名称>`：重命名当前线程；群聊通道会同步修改群聊名称，真实群名会自动带 `[botname]` 前缀。
 - `/new`：发送创建表单，填写名称和工作目录后创建新的 IM 群聊会话。
 - `/clear [名称] [路径]`：在当前聊天上下文创建新的对话并绑定过去，之后仍可用 `/t` 找回旧对话。

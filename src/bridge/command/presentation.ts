@@ -102,6 +102,7 @@ function buildRuntimeSelect(
       { text: 'Kimi', callbackData: buildCommandCallbackData(`/t kimi${suffix}`) },
       { text: 'Cursor', callbackData: buildCommandCallbackData(`/t cursor${suffix}`) },
       { text: 'ZCode', callbackData: buildCommandCallbackData(`/t zcode${suffix}`) },
+      { text: 'Antigravity', callbackData: buildCommandCallbackData(`/t antigravity${suffix}`) },
     ],
   };
 }
@@ -111,6 +112,7 @@ function localRuntimeOf(session: LocalRuntimeSessionSummary): LocalSessionListRu
   if (session.runtime === 'kimi') return 'kimi';
   if (session.runtime === 'cursor') return 'cursor';
   if (session.runtime === 'zcode') return 'zcode';
+  if (session.runtime === 'antigravity') return 'antigravity';
   return 'codex';
 }
 
@@ -119,18 +121,20 @@ function formatLocalRuntimeCreator(session: LocalRuntimeSessionSummary): string 
   if (localRuntimeOf(session) === 'kimi') return 'Kimi Code';
   if (localRuntimeOf(session) === 'cursor') return 'Cursor Agent';
   if (localRuntimeOf(session) === 'zcode') return 'ZCode';
+  if (localRuntimeOf(session) === 'antigravity') return 'Antigravity';
   return formatCreatorBadge(resolveCreatorKind({
     source: session.source,
     originator: session.originator,
   })).label;
 }
 
-function formatLocalThreadListTitle(codexCount: number, claudeCount: number, kimiCount: number, cursorCount: number, zcodeCount: number, bridgeCount: number): string {
+function formatLocalThreadListTitle(codexCount: number, claudeCount: number, kimiCount: number, cursorCount: number, zcodeCount: number, antigravityCount: number, bridgeCount: number): string {
   const parts = [`Codex${codexCount}`];
   if (claudeCount > 0) parts.push(`Claude${claudeCount}`);
   if (kimiCount > 0) parts.push(`Kimi${kimiCount}`);
   if (cursorCount > 0) parts.push(`Cursor${cursorCount}`);
   if (zcodeCount > 0) parts.push(`ZCode${zcodeCount}`);
+  if (antigravityCount > 0) parts.push(`Antigravity${antigravityCount}`);
   if (bridgeCount > 0) parts.push(`Bridge${bridgeCount}`);
   return `本地会话（${parts.join(' + ')}）`;
 }
@@ -550,7 +554,7 @@ function buildRuntimeThreadSelect(
       };
     });
   if (options.length === 0) return null;
-  const runtimeLabel = runtime === 'claude' ? 'Claude Code' : runtime === 'kimi' ? 'Kimi Code' : runtime === 'cursor' ? 'Cursor Agent' : runtime === 'zcode' ? 'ZCode' : 'Codex';
+  const runtimeLabel = runtime === 'claude' ? 'Claude Code' : runtime === 'kimi' ? 'Kimi Code' : runtime === 'cursor' ? 'Cursor Agent' : runtime === 'zcode' ? 'ZCode' : runtime === 'antigravity' ? 'Antigravity' : 'Codex';
   return {
     id: `${runtime}_select`,
     placeholder: `选择 ${runtimeLabel} 会话`,
@@ -572,7 +576,7 @@ function buildRuntimeThreadTableBlock(
     .filter(({ item }) => item.kind === 'local' && localRuntimeOf(item.local) === runtime)
     .map(({ row }) => row);
   const select = buildRuntimeThreadSelect(runtime, items, selectedCallbackData);
-  const label = runtime === 'claude' ? 'Claude Code' : runtime === 'kimi' ? 'Kimi Code' : runtime === 'cursor' ? 'Cursor Agent' : runtime === 'zcode' ? 'ZCode' : 'Codex';
+  const label = runtime === 'claude' ? 'Claude Code' : runtime === 'kimi' ? 'Kimi Code' : runtime === 'cursor' ? 'Cursor Agent' : runtime === 'zcode' ? 'ZCode' : runtime === 'antigravity' ? 'Antigravity' : 'Codex';
   const refreshCommand = showAll
     ? `/t ${runtime} n ${limit || MAX_LOCAL_SESSION_LIST_LIMIT}`
     : limit && limit !== DEFAULT_LOCAL_SESSION_LIST_LIMIT
@@ -662,7 +666,8 @@ export function buildLocalRuntimeSessionsCommandResponse(
   const kimiCount = localSessions.filter((session) => localRuntimeOf(session) === 'kimi').length;
   const cursorCount = localSessions.filter((session) => localRuntimeOf(session) === 'cursor').length;
   const zcodeCount = localSessions.filter((session) => localRuntimeOf(session) === 'zcode').length;
-  const title = formatLocalThreadListTitle(codexCount, claudeCount, kimiCount, cursorCount, zcodeCount, 0);
+  const antigravityCount = localSessions.filter((session) => localRuntimeOf(session) === 'antigravity').length;
+  const title = formatLocalThreadListTitle(codexCount, claudeCount, kimiCount, cursorCount, zcodeCount, antigravityCount, 0);
   const limitNotice = buildLocalRuntimeSessionLimitNotice(actualCount, limit);
   const globalItems = buildGlobalThreadList(localSessions, []);
   return buildThreadCommandTableResponse(
@@ -714,6 +719,8 @@ export function buildLocalRuntimeSessionsCommandCard(
         ? 'cursor'
         : options.activeRuntime === 'zcode'
           ? 'zcode'
+          : options.activeRuntime === 'antigravity'
+            ? 'antigravity'
       : 'codex';
   const card: OutboundRichCard = {
     title: '',

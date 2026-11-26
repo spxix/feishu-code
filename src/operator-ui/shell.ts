@@ -141,6 +141,13 @@ ${logsPageHtml}      </main>
             <label>ZCode Provider<select id="sessionConfigZcodeProvider"><option value="">跟随全局</option><option value="tmux">tmux</option></select></label>
             <label>ZCode 模式<select id="sessionConfigZcodeMode"><option value="">跟随全局</option><option value="build">build</option><option value="edit">edit</option><option value="plan">plan</option><option value="yolo">yolo</option></select></label>
           </div>
+          <div class="field-row triple" id="sessionConfigAntigravityBlock" hidden>
+            <label>Antigravity 模型<input id="sessionConfigAntigravityModel" placeholder="留空跟随全局 Antigravity 默认模型" /></label>
+            <label>Antigravity Provider<select id="sessionConfigAntigravityProvider"><option value="">跟随全局</option><option value="acp">acp</option></select></label>
+            <label>Antigravity 模式<select id="sessionConfigAntigravityMode"><option value="">跟随全局</option><option value="default">default</option><option value="accept-edits">accept-edits</option><option value="auto">auto</option><option value="plan">plan</option><option value="yolo">yolo</option></select></label>
+            <label>Antigravity 思考级别<select id="sessionConfigAntigravityReasoning"><option value="">跟随全局</option><option value="low">low</option><option value="medium">medium</option><option value="high">high</option><option value="xhigh">xhigh</option></select></label>
+            <label>Antigravity sandbox<select id="sessionConfigAntigravitySandbox"><option value="">跟随全局</option><option value="on">启用</option><option value="off">关闭</option></select></label>
+          </div>
           <label>系统提示<textarea id="sessionConfigPrompt" placeholder="留空则不覆盖系统提示"></textarea></label>
         </div>
         <div class="toolbar modal-actions">

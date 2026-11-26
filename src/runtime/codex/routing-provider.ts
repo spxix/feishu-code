@@ -9,6 +9,7 @@ import { KimiTmuxProvider } from '../kimi/tmux-provider.js';
 import { CursorTmuxProvider } from '../cursor/provider.js';
 import { CursorAcpProvider } from '../cursor/acp-provider.js';
 import { ZcodeTmuxProvider } from '../zcode/tmux-provider.js';
+import { AntigravityAcpProvider } from '../antigravity/acp-provider.js';
 import { CodexTmuxProvider } from './tmux-provider.js';
 import { streamCodexAppServer } from './app-server-provider.js';
 
@@ -25,6 +26,7 @@ export class CodexRoutingProvider implements LLMProvider {
   private readonly cursorTmuxProvider: LLMProvider;
   private readonly cursorAcpProvider: LLMProvider;
   private readonly zcodeTmuxProvider: LLMProvider;
+  private readonly antigravityAcpProvider: LLMProvider;
 
   constructor(pendingPerms?: PendingPermissions, _legacyDefaultProvider?: unknown) {
     this.tmuxProvider = new CodexTmuxProvider(pendingPerms);
@@ -35,9 +37,18 @@ export class CodexRoutingProvider implements LLMProvider {
     this.cursorTmuxProvider = new CursorTmuxProvider();
     this.cursorAcpProvider = new CursorAcpProvider(pendingPerms);
     this.zcodeTmuxProvider = new ZcodeTmuxProvider();
+    this.antigravityAcpProvider = new AntigravityAcpProvider(pendingPerms);
   }
 
   streamChat(params: StreamChatParams): ReadableStream<string> {
+    if (params.runtime === 'antigravity') {
+      console.log('[codex-routing-provider] Route Antigravity request:', {
+        bridge_session_id: params.sessionId,
+        runtime: params.runtime,
+        provider: 'acp',
+      });
+      return this.antigravityAcpProvider.streamChat(params);
+    }
     if (params.runtime === 'zcode') {
       console.log('[codex-routing-provider] Route ZCode request:', {
         bridge_session_id: params.sessionId,

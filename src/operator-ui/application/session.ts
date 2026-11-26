@@ -40,11 +40,13 @@ import {
   defaultUiSessionKimiSource,
   defaultUiSessionCursorSource,
   defaultUiSessionZcodeSource,
+  defaultUiSessionAntigravitySource,
   type UiSessionCodexSource,
   type UiSessionClaudeSource,
   type UiSessionKimiSource,
   type UiSessionCursorSource,
   type UiSessionZcodeSource,
+  type UiSessionAntigravitySource,
   type UiSessionRuntimeSource,
 } from './session-source.js';
 
@@ -62,6 +64,8 @@ export interface UiSessionIdentity {
   cursorCwd?: string;
   zcodeSessionId?: string;
   zcodeCwd?: string;
+  antigravitySessionId?: string;
+  antigravityCwd?: string;
 }
 
 export interface UiSessionHistoryMessage {
@@ -175,7 +179,9 @@ function applySessionConfigToml(bridgeSessionId: string, payload: Record<string,
         ? 'cursor'
         : payload.activeRuntime === 'zcode'
           ? 'zcode'
-        : 'codex';
+          : payload.activeRuntime === 'antigravity'
+            ? 'antigravity'
+            : 'codex';
   if (typeof payload.workingDirectory === 'string') {
     const workspace = payload.workingDirectory.trim() || process.cwd();
     createConfigService({ migrate: false }).set(
@@ -318,6 +324,63 @@ function applySessionConfigToml(bridgeSessionId: string, payload: Record<string,
     return;
   }
 
+  if (activeRuntime === 'antigravity') {
+    if (typeof payload.antigravityModel === 'string') {
+      setOrUnsetSessionConfig(
+        bridgeSessionId,
+        'runtime.antigravity.model',
+        payload.antigravityModel.trim(),
+        (model) => ({ runtime: { antigravity: { model } } }),
+      );
+    }
+    if (payload.antigravityProvider === 'acp' || payload.antigravityProvider === '') {
+      setOrUnsetSessionConfig(
+        bridgeSessionId,
+        'runtime.antigravity.provider',
+        payload.antigravityProvider,
+        (provider) => ({ runtime: { antigravity: { provider } } }),
+      );
+    }
+    if (
+      payload.antigravityMode === 'default'
+      || payload.antigravityMode === 'accept-edits'
+      || payload.antigravityMode === 'auto'
+      || payload.antigravityMode === 'plan'
+      || payload.antigravityMode === 'yolo'
+      || payload.antigravityMode === ''
+    ) {
+      setOrUnsetSessionConfig(
+        bridgeSessionId,
+        'runtime.antigravity.mode',
+        payload.antigravityMode,
+        (mode) => ({ runtime: { antigravity: { mode } } }),
+      );
+    }
+    if (
+      payload.antigravityReasoningEffort === 'low'
+      || payload.antigravityReasoningEffort === 'medium'
+      || payload.antigravityReasoningEffort === 'high'
+      || payload.antigravityReasoningEffort === 'xhigh'
+      || payload.antigravityReasoningEffort === ''
+    ) {
+      setOrUnsetSessionConfig(
+        bridgeSessionId,
+        'runtime.antigravity.reasoningEffort',
+        payload.antigravityReasoningEffort,
+        (reasoningEffort) => ({ runtime: { antigravity: { reasoningEffort } } }),
+      );
+    }
+    if (typeof payload.antigravitySandbox === 'boolean' || payload.antigravitySandbox === '') {
+      setOrUnsetSessionConfig(
+        bridgeSessionId,
+        'runtime.antigravity.sandbox',
+        payload.antigravitySandbox,
+        (sandbox) => ({ runtime: { antigravity: { sandbox } } }),
+      );
+    }
+    return;
+  }
+
   if (typeof payload.model === 'string') {
     setOrUnsetSessionConfig(
       bridgeSessionId,
@@ -425,7 +488,9 @@ function sanitizeSessionConfig(payload: Record<string, unknown>): BridgeSessionU
         ? 'cursor'
         : payload.activeRuntime === 'zcode'
           ? 'zcode'
-        : 'codex';
+          : payload.activeRuntime === 'antigravity'
+            ? 'antigravity'
+            : 'codex';
   if (typeof payload.name === 'string') {
     updates.name = payload.name.trim() || undefined;
   }
@@ -466,6 +531,11 @@ function sessionConfigPayload(session: BridgeSession) {
     zcodeModel: getSessionConfigTomlOverride<string>(session, 'runtime.zcode.model') || '',
     zcodeProvider: getSessionConfigTomlOverride<string>(session, 'runtime.zcode.provider') || '',
     zcodeMode: getSessionConfigTomlOverride<string>(session, 'runtime.zcode.mode') || '',
+    antigravityModel: getSessionConfigTomlOverride<string>(session, 'runtime.antigravity.model') || '',
+    antigravityProvider: getSessionConfigTomlOverride<string>(session, 'runtime.antigravity.provider') || '',
+    antigravityMode: getSessionConfigTomlOverride<string>(session, 'runtime.antigravity.mode') || '',
+    antigravityReasoningEffort: getSessionConfigTomlOverride<string>(session, 'runtime.antigravity.reasoningEffort') || '',
+    antigravitySandbox: getSessionConfigTomlOverride<boolean>(session, 'runtime.antigravity.sandbox'),
   };
 }
 
@@ -477,14 +547,15 @@ export class UiSessionApplication {
     private readonly kimiSource: UiSessionKimiSource = defaultUiSessionKimiSource,
     private readonly cursorSource: UiSessionCursorSource = defaultUiSessionCursorSource,
     private readonly zcodeSource: UiSessionZcodeSource = defaultUiSessionZcodeSource,
+    private readonly antigravitySource: UiSessionAntigravitySource = defaultUiSessionAntigravitySource,
   ) {}
 
   private createRuntimeSource(): UiSessionRuntimeSource {
-    return createUiSessionRuntimeSource(this.codexSource, this.claudeSource, this.kimiSource, this.cursorSource, this.zcodeSource);
+    return createUiSessionRuntimeSource(this.codexSource, this.claudeSource, this.kimiSource, this.cursorSource, this.zcodeSource, this.antigravitySource);
   }
 
   private createSessionRegistry() {
-    return createUiSessionRegistry(this.store, this.codexSource, this.claudeSource, this.kimiSource, this.cursorSource, this.zcodeSource);
+    return createUiSessionRegistry(this.store, this.codexSource, this.claudeSource, this.kimiSource, this.cursorSource, this.zcodeSource, this.antigravitySource);
   }
 
   listSessions(limit?: number): UiSessionListPayload {
@@ -602,6 +673,17 @@ export class UiSessionApplication {
       };
     }
 
+    if (identity.antigravitySessionId) {
+      const runtimeSource = this.createRuntimeSource();
+      const summary = runtimeSessionToSummary(runtimeSource, this.store, 'antigravity', identity.antigravitySessionId, identity.antigravityCwd);
+      if (!summary) throw new Error('指定的 Antigravity 会话不存在。');
+      return {
+        session: summary,
+        source: 'antigravity',
+        messages: uiRuntimeHistoryMessages(runtimeSource, 'antigravity', identity.antigravitySessionId, identity.antigravityCwd),
+      };
+    }
+
     throw new Error('不支持的会话目标。');
   }
 
@@ -655,6 +737,15 @@ export class UiSessionApplication {
     };
   }
 
+  importAntigravityThread(antigravitySessionId: string, cwd: string) {
+    const session = this.createSessionRegistry().materializeAntigravityThread(antigravitySessionId, cwd);
+    return {
+      bridgeSessionId: session.id,
+      session: bridgeSessionToSummary(session),
+      config: sessionConfigPayload(session),
+    };
+  }
+
   renameSession(identity: UiSessionIdentity, name: string | undefined) {
     const registry = this.createSessionRegistry();
     const updated = identity.bridgeSessionId
@@ -667,7 +758,9 @@ export class UiSessionApplication {
             ? registry.renameKimiThread(identity.kimiSessionId, identity.kimiCwd, name)
             : identity.cursorSessionId && identity.cursorCwd
               ? registry.renameCursorThread(identity.cursorSessionId, identity.cursorCwd, name)
-              : registry.renameZcodeThread(identity.zcodeSessionId!, identity.zcodeCwd!, name);
+              : identity.zcodeSessionId && identity.zcodeCwd
+                ? registry.renameZcodeThread(identity.zcodeSessionId, identity.zcodeCwd, name)
+                : registry.renameAntigravityThread(identity.antigravitySessionId!, identity.antigravityCwd || '', name);
     return sessionConfigPayload(updated);
   }
 
@@ -749,6 +842,14 @@ export class UiSessionApplication {
       const summary = runtimeSessionToSummary(runtimeSource, this.store, 'zcode', identity.zcodeSessionId, identity.zcodeCwd);
       if (!summary) throw new Error('指定的 ZCode 会话不存在。');
       const result = this.createSessionRegistry().archiveZcodeThread(identity.zcodeSessionId, identity.zcodeCwd);
+      return { deleted: summary, deletedBridgeSessionIds: result.deletedBridgeSessionIds };
+    }
+
+    if (identity.antigravitySessionId) {
+      const runtimeSource = this.createRuntimeSource();
+      const summary = runtimeSessionToSummary(runtimeSource, this.store, 'antigravity', identity.antigravitySessionId, identity.antigravityCwd);
+      if (!summary) throw new Error('指定的 Antigravity 会话不存在。');
+      const result = this.createSessionRegistry().archiveAntigravityThread(identity.antigravitySessionId, identity.antigravityCwd || summary.cwd || '');
       return { deleted: summary, deletedBridgeSessionIds: result.deletedBridgeSessionIds };
     }
 

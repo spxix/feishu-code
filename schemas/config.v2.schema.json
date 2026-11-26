@@ -53,7 +53,7 @@
       "type": "object",
       "properties": {
         "agent": {
-          "enum": ["codex", "claude", "kimi", "cursor", "zcode"]
+          "enum": ["codex", "claude", "kimi", "cursor", "zcode", "antigravity"]
         },
         "codex": {
           "$ref": "#/$defs/codex"
@@ -69,6 +69,9 @@
         },
         "zcode": {
           "$ref": "#/$defs/zcode"
+        },
+        "antigravity": {
+          "$ref": "#/$defs/antigravity"
         }
       },
       "additionalProperties": false
@@ -169,6 +172,27 @@
         },
         "mode": {
           "enum": ["build", "edit", "plan", "yolo"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "antigravity": {
+      "type": "object",
+      "properties": {
+        "model": {
+          "type": "string"
+        },
+        "provider": {
+          "const": "acp"
+        },
+        "mode": {
+          "enum": ["default", "accept-edits", "auto", "plan", "yolo"]
+        },
+        "reasoning_effort": {
+          "enum": ["", "low", "medium", "high", "xhigh"]
+        },
+        "sandbox": {
+          "type": "boolean"
         }
       },
       "additionalProperties": false
