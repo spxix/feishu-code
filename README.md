@@ -1,14 +1,14 @@
-# CodeLark
+# feishu-code
 
 <p align="center">
-  <img src="docs/assets/readme/codelark-logo.png" alt="CodeLark logo" width="280">
+  <img src="docs/assets/readme/codelark-logo.png" alt="feishu-code logo" width="280">
 </p>
 
-> 你的下一次Vibe Coding，何必从终端开始？以一流的 UI 界面和智能体协作，work ALL in 飞书。
+> 在飞书 / Lark 中直接控制本机编程智能体（支持 Antigravity、Codex、Claude Code、Kimi Code、Cursor Agent、ZCode），提供流式卡片、多群并行会话与本地会话接管。
 
-- 本仓库（含 Antigravity 支持）：[GitHub (`spxix/feishu-code`)](https://github.com/spxix/feishu-code)
-- 上游项目：[huiyeruzhou/codelark](https://github.com/huiyeruzhou/codelark)（[使用文档](https://huiyeruzhou.github.io/site/codelark/)）
-- 基于上游版本：`codelark@0.5.1`
+- 代码仓库：[GitHub (`spxix/feishu-code`)](https://github.com/spxix/feishu-code)
+- 手动飞书应用配置：[platform-setup.md](docs/guide/platform-setup.md)
+- 日常工作流与会话管理：[daily-workflow.md](docs/guide/daily-workflow.md) · [session-workflows.md](docs/guide/session-workflows.md)
 
 ## 核心能力
 
@@ -22,7 +22,7 @@
 
 ## Showcase
 
-> 第一次使用请看 [5 分钟日常工作流](https://huiyeruzhou.github.io/site/codelark/guide/daily-workflow)；设计模块和源码入口见 [CodeLark 设计文档](https://huiyeruzhou.github.io/site/codelark/product/)。
+> 第一次使用请先看 [手动飞书配置指南](docs/guide/platform-setup.md) 与 [5 分钟日常工作流](docs/guide/daily-workflow.md)。
 
 
 <table>
@@ -109,16 +109,6 @@ npx --yes --package=npm@11.6.2 -c 'codelark_pkg=$(npm pack "git+https://github.c
 
 > **更新提醒：** 请勿点击飞书内可能弹出的上游 npm「立即更新并重启」提示（它会安装上游 `codelark` 并覆盖 Antigravity 支持）。如需关闭每日 npm 版本检查，可在启动前设置 `CODELARK_DISABLE_DAILY_VERSION_CHECK=1`；更新本仓库请直接执行 `git pull && npm install && npm run build`。
 
-## v0.5.1
-
-`0.5.1` 修正附件发送语义：仅 Markdown 附图自动上传，普通文件链接保留在正文；`/file` 发送图片时使用飞书原生图片消息。
-
-## v0.5.0
-
-`0.5.0` 新增客服话题模式（`/customer on`、`/whitelist`），支持普通群中的话题追问；图片、引用文件和合并转发成为通用附件输入。Cursor Desktop 补齐原生控制、可选增强安装与卸载、工具结果及历史同步选择，持续使用统一的 `tmux` 入口。本版本还兼容 Codex CLI 0.163.0，并修复流式续卡导致的进度积压。
-
-完整发布说明见 [Release Notes](docs/guide/release-notes.md)。
-
 ## 常用命令
 - `/`：查看或修改当前群的会话配置。
 - `/set`：修改全局默认配置；新建群会继承这些默认值。
@@ -180,14 +170,9 @@ npx --yes --package=npm@11.6.2 -c 'codelark_pkg=$(npm pack "git+https://github.c
 
 
 
-## 社区
-
-| 微信 | 飞书 |
-| --- | --- |
-| <img src="docs/assets/community/wechat-qr.png" alt="微信群二维码" width="180"> | <img src="docs/assets/community/feishu-qr.png" alt="飞书群二维码" width="180"> |
-
 ## 致谢
 
-深受以下项目的启发，并感谢作者们的开源
+本仓库基于开源项目演进，感谢原作者们的贡献：
+- [huiyeruzhou/codelark](https://github.com/huiyeruzhou/codelark)
 - codex-to-im
 - lark-coding-agent-bridge
