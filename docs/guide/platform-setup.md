@@ -43,6 +43,7 @@
       "im:chat:read",
       "im:chat:update",
       "im:message.group_at_msg:readonly",
+      "im:message.group_msg",
       "im:message.p2p_msg:readonly",
       "im:message.pins:write_only",
       "im:message.reactions:read",
@@ -56,6 +57,9 @@
   }
 }
 ```
+
+> **为什么需要同时包含 `im:message.group_msg`？**
+> 仅配置 `im:message.group_at_msg:readonly` 时，飞书只会把 `@机器人` 的群消息推送给 CodeLark。加上 `im:message.group_msg`（获取群组中所有消息）后，用 `/new` 创建的多个独立任务群即可直接发普通消息，无需每条都 `@bot`（前提是该群未开启 `/require-at on`）。同时配置 `allowed_users` 且不拉他人进任务群，即可保证仅本人可触发机器人。
 
 > **为什么不包含 `im:chat:create_by_user`？**
 > 在部分飞书 / Lark 租户的批量导入中，`im:chat:create_by_user` 会标红（该租户未将其作为 tenant scope 开放）。去掉它即可正常导入，`im:chat:create` 已足够机器人创建会话群聊。

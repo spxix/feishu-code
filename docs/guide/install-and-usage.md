@@ -160,7 +160,7 @@ http://127.0.0.1:4781
 
 1. 在飞书开放平台创建自建应用（建议按计算节点建 1 个 bot，而非按 runtime 建多个），记录 `App ID` 和 `App Secret`。
 2. 启用 Bot 能力。
-3. 批量导入最小核心权限（`cardkit:card:*`、`im:chat:*`、`im:message:*`、`im:resource`；部分租户 `im:chat:create_by_user` 标红时可直接去掉；如仅本人私用可跳过 `docs:document.comment:*`）。
+3. 批量导入最小核心权限（`cardkit:card:*`、`im:chat:*`、`im:message:*` 含 `im:message.group_msg`、`im:resource`；部分租户 `im:chat:create_by_user` 标红时可直接去掉；如仅本人私用可跳过 `docs:document.comment:*`）。
 4. 将可见范围收紧为仅自己，发布 `1.0.0` 并审批通过。
 5. 本机运行 `codelark setup`（手动粘贴凭据，填写 `allowed_users`），执行 `chmod 700 ~/.codelark` 并先运行 `codelark start` 让 WebSocket 上线。
 6. 回到飞书后台 **事件与回调**，将事件和回调的订阅方式都切到 **长连接**，添加 `im.message.receive_v1`、`im.chat.member.bot.deleted_v1`、`im.chat.disbanded_v1` 以及回调 `card.action.trigger`（仅本人私用时跳过 `drive.notice.comment_add_v1`）。
